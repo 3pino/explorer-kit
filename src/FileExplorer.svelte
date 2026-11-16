@@ -47,6 +47,7 @@
   const explorer = pick();
   const { api: sharedApi, urls, rules, host, nav: fileExplorer, index: sharedIndex, buffer: explorerBuffer, selection: explorerSelection, view: explorerView } = explorer;
   const scopeSource = explorer.scope;
+  const labels = explorer.labels;
   const PdfThumb = host.PdfThumb;
   /** 長押しとみなす時間（ms） */
   const LONG_PRESS_MS = 400;
@@ -1408,7 +1409,7 @@
     <span class="file-explorer-popup">
       <IconButton label="メニュー" title="メニュー" active={menuOpen} onclick={() => (menuOpen = !menuOpen)}><MenuIcon size={18} /></IconButton>
       {#if menuOpen}
-        <Menu class="file-explorer-popup-menu file-explorer-menu" label="共有フォルダの操作" onclose={() => (menuOpen = false)}>
+        <Menu class="file-explorer-popup-menu file-explorer-menu" label="{labels.root}の操作" onclose={() => (menuOpen = false)}>
           {#if canCreateFolder}
             <MenuItem icon={FolderPlus} onclick={() => run(openMkdir)}>新しいフォルダ</MenuItem>
           {/if}
@@ -1436,7 +1437,7 @@
       onclick={() => fileExplorer.open('')}
       ondragover={(ev) => crumbDragOver(ev, '')}
       ondragleave={() => crumbDragLeave('')}
-      ondrop={(ev) => void crumbDrop(ev, '')}>共有フォルダ</button>
+      ondrop={(ev) => void crumbDrop(ev, '')}>{labels.root}</button>
     {#each crumbs as c (c.path)}
       <ChevronRight size={12} />
       <button type="button" class="file-explorer-crumb" data-drop-dir={c.path} class:file-explorer-crumb-drag-over={dragTarget === '__crumb__' + c.path}
@@ -1486,7 +1487,7 @@
       <p class="file-explorer-status muted">読み込み中…</p>
     {:else if listing.kind === 'missing'}
       <p class="file-explorer-status muted">このフォルダは見つかりません。</p>
-      <div class="file-explorer-retry"><Button onclick={() => fileExplorer.open('')}>{#snippet children()}共有フォルダへ戻る{/snippet}</Button></div>
+      <div class="file-explorer-retry"><Button onclick={() => fileExplorer.open('')}>{#snippet children()}{labels.root}へ戻る{/snippet}</Button></div>
     {:else if listing.kind === 'error'}
       <p class="file-explorer-status file-explorer-error" role="alert">読み込めませんでした: {listing.message}</p>
       <div class="file-explorer-retry"><Button onclick={() => fileExplorer.reload()}>{#snippet children()}再読み込み{/snippet}</Button></div>
@@ -1607,7 +1608,7 @@
 {#if ctx}
   <div class="file-explorer-context" style:left="{ctx.x}px" style:top="{ctx.y}px">
     <Menu class="file-explorer-context-menu file-explorer-menu" label="このフォルダの操作" onclose={() => (ctx = null)}>
-      <MenuItem icon={Upload} onclick={() => runCtx(() => fileInput?.click())}>アップロード</MenuItem>
+      <MenuItem icon={Upload} onclick={() => runCtx(() => fileInput?.click())}>{labels.upload}</MenuItem>
       {#if canCreateFolder}
         <MenuItem icon={FolderPlus} onclick={() => runCtx(openMkdir)}>新しいフォルダ</MenuItem>
       {/if}

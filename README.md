@@ -26,11 +26,16 @@ npm install github:3pino/explorer-kit#v0.1.0
 ```
 
 配布はソースのまま（`.svelte`・`.svelte.ts`・`.ts`）。取り込む側の Vite（`@sveltejs/vite-plugin-svelte`）が変換します。
+開発サーバーの依存の事前バンドルは JS だけを想定しているので、取り込む側の `vite.config.ts` で外してください。
+
+```ts
+optimizeDeps: { exclude: ['@3pino/explorer-kit'] },
+```
 
 ```ts
 import { createExplorer } from '@3pino/explorer-kit';
 
-export const explorer = createExplorer({ api, urls, rules, host, viewStore });
+export const explorer = createExplorer({ api, urls, rules, host, viewStore, labels: { root: "共有フォルダ", upload: "アップロード" } });
 ```
 
 ```svelte

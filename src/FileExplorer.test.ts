@@ -27,7 +27,7 @@ function open(entries = [dir('docs'), file('a.txt'), file('docs/inner.txt'), dir
   const api = fakeApi(entries);
   let saved: unknown = {};
   const explorer: Explorer = createExplorer({
-    api, urls: fakeUrls, rules: PLAIN_RULES, host: fakeHost(host), caps,
+    api, urls: fakeUrls, rules: PLAIN_RULES, host: fakeHost(host), caps, labels: { root: 'いちばん上', upload: '取り込む' },
     viewStore: { read: () => saved, write: (m) => (saved = m) },
   });
   explorer.selection.desktop = true;
@@ -72,5 +72,14 @@ describe('エクスプローラーの画面（置き場所と本体は、渡さ�
     del.click();
     await tick();
     expect(api.trash).toHaveBeenCalledWith('attachments');
+  });
+});
+
+describe('置き場所ごとの言葉', () => {
+  it('いちばん上の名前は、渡されたものを道筋の先頭に出す', async () => {
+    const { target } = open();
+    await tick();
+    expect(target.querySelector('.file-explorer-crumbs button')!.textContent).toBe('いちばん上');
+    expect(target.textContent).not.toContain('共有フォルダ');
   });
 });
