@@ -1,0 +1,156 @@
+// 項目の移動・コピー（切り取り・コピー・貼り付け・ドラッグ）の決まり。見た目は持たない。
+// 置き場所の決まりに合わせて先に判定する。最後の判定は置き場所（Disnans ではサーバー）。置き場所ごとの違いは Rules で受け取る。
+// - 共有フォルダと attachments/ の間は移動できない（コピーは可）。attachments/ の中の移動は名前の変更だけ（ファイルのみ）
+// - フォルダを自分の中へは移動・コピーできない
+// - 同名があれば上書き（必ず確認する）。同名のフォルダがあれば止める（sharedOps の共通規則）
+
+import type { Entry, ExplorerApi, Rules } from './types';
+import { baseName, childPath, parentOf } from './path';
+import { inAttachments, overwriteConfirm, RESERVED_REASON, sameNameEntry } from './ops';
+
+export type TransferOp = 'move' | 'copy';
+
+/**
+ * 移動・コピーする項目（パスと種類。バッファにも入る）。
+ * name: 先の名前（省略はパスの末尾）。ゴミ箱の直下の項目は元の名前（別名のままコピーしない）。
+ * trash: ゴミ箱の仮想フォルダの中での場所（省略は、ふつうの項目）。
+ *   root = `.trash/` そのもの（動かせない・コピーもできない）/ inside = 中身（コピーだけ）/
+ *   item = 直下の項目（コピーは元の名前で。移動は元の場所へ戻すときだけ。restoreTo は元のパス）
+ */
+export type TransferItem = {
+  path: string;
+  kind: 'file' | 'dir';
+  name?: string;
+  trash?: { where: 'root' } | { where: 'inside' } | { where: 'item'; restoreTo: string };
+};
+
+export type Check = { ok: true } | { ok: false; message: string };
+
+const ok: Check = { ok: true };
+const fail = (message: string): Check => ({ ok: false, message });
+
+/** 項目を、移動先のフォルダへ move / copy できるか（サーバーの決まりと同じ） */
+export function checkTransfer(rules: Rules, op: TransferOp, item: TransferItem, destDir: string): Check {
+  if (rules.attachmentsDir !== null && item.path === rules.attachmentsDir) return fail(RESERVED_REASON);
+  const trash = item.trash;
+  if (trash?.where === 'root') return fail('ゴミ箱のフォルダは動かせません');
+  if (trash?.where === 'inside' && op === 'move') return fail('ゴミ箱の中身は動かせません（コピーしてください）');
+  if (trash?.where === 'item' && op === 'move') {
+    // 移動は、元の場所へ戻すことだけ（元のパスぴったり）。ほかの先へは移せない
+    const back = parentOf(trash.restoreTo);
+    return destDir === back ? ok : fail(`ゴミ箱の項目は、元の場所（${back === '' ? '共有フォルダの直下' : back}）へだけ戻せます`);
+  }
+  // フォルダを自分自身・子孫へは移動もコピーもできない
+  if (item.kind === 'dir' && (destDir === item.path || destDir.startsWith(item.path + '/'))) {
+    return op === 'move' ? fail('フォルダを自分の中へは移せません') : fail('フォルダを自分の中へはコピーできません');
+  }
+  if (op === 'move' && !trash) {
+    if (inAttachments(rules, item.path) !== inAttachments(rules, destDir)) return fail('共有フォルダと添付の間は移動できません（コピーしてください）');
+  }
+  return ok;
+}
+
+/** 1 件の貼り付けの決まり */
+export type Planned = {
+  item: TransferItem;
+  /** 先の名前（移動・コピー先の項目名） */
+  name: string;
+  /** 先のパス（上書きのときは、既存の項目の名前に合わせる） */
+  to: string;
+  /** create: 作る / overwrite: 上書き（確認する） / skip: 何もしない（同じ場所） / blocked: 止める（message） */
+  kind: 'create' | 'overwrite' | 'skip' | 'blocked';
+  message?: string;
+};
+
+/**
+ * 貼り付け・移動の前に、項目ごとの決まりを決める。
+ * destEntries は移動先の一覧（読み終えていなければ null。その場合は止める: 同名を黙って上書きしないため）
+ */
+export function planTransfer(
+  rules: Rules,
+  op: TransferOp,
+  items: readonly TransferItem[],
+  destDir: string,
+  destEntries: ReadonlyMap<string, Entry> | null,
+): Planned[] {
+  return items.map((item): Planned => {
+    const name = item.name ?? baseName(item.path);
+    const to = childPath(destDir, name);
+    const blocked = (message: string): Planned => ({ item, name, to, kind: 'blocked', message });
+    const c = checkTransfer(rules, op, item, destDir);
+    if (!c.ok) return blocked(c.message);
+    if (to === item.path) return { item, name, to, kind: 'skip', message: '同じ場所です' };
+    const bad = rules.nameError(destDir, name);
+    if (bad) return blocked(bad);
+    if (!destEntries) return blocked('フォルダの中身を読み終えてから、もう一度試してください');
+    const same = sameNameEntry(rules, destEntries, destDir, name);
+    if (!same) return { item, name, to, kind: 'create' };
+    // ゴミ箱から元へ戻すときは、上書きしない（同じ名前があれば戻せない。サーバーの決まり）
+    if (op === 'move' && item.trash?.where === 'item') return blocked('同じ名前があるので、元の場所へ戻せません');
+    // 上書きの先は既存の項目の名前（attachments/ は大文字・小文字を区別しない）
+    if (same.kind === 'dir') return blocked('同じ名前のフォルダがあります');
+    return { item, name, to: childPath(destDir, same.name), kind: 'overwrite' };
+  });
+}
+
+/**
+ * 実行の結果。done: できた / failed: 止めた or 失敗 / skipped: 同じ場所で何もしなかった /
+ * declined: 上書きの確認で取り消した（送っていない。切り取りのバッファには残す）
+ */
+export type TransferResult = {
+  done: TransferItem[];
+  failed: { item: TransferItem; message: string }[];
+  skipped: TransferItem[];
+  declined: TransferItem[];
+};
+
+export type TransferInput = {
+  op: TransferOp;
+  items: readonly TransferItem[];
+  destDir: string;
+  destEntries: ReadonlyMap<string, Entry> | null;
+  rules: Rules;
+  /** 失敗を、利用者向けの文にする */
+  errorText: (e: unknown) => string;
+  /** 上書きの確認。false なら、その項目は何もしない */
+  confirm: (c: ReturnType<typeof overwriteConfirm>) => Promise<boolean>;
+  api: Pick<ExplorerApi, 'move' | 'copy'>;
+  /** 変わったパスを知らせる（一覧の写しを捨てる） */
+  invalidate: (path: string) => void;
+};
+
+/** 項目を順に移動・コピーする。上書きは 1 件ずつ確認する。失敗しても残りは続ける */
+export async function runTransfer(input: TransferInput): Promise<TransferResult> {
+  const result: TransferResult = { done: [], failed: [], skipped: [], declined: [] };
+  for (const p of planTransfer(input.rules, input.op, input.items, input.destDir, input.destEntries)) {
+    if (p.kind === 'blocked') {
+      result.failed.push({ item: p.item, message: p.message ?? '貼り付けられません' });
+      continue;
+    }
+    if (p.kind === 'skip') {
+      result.skipped.push(p.item);
+      continue;
+    }
+    if (p.kind === 'overwrite' && !(await input.confirm(overwriteConfirm(input.rules, p.to)))) {
+      result.declined.push(p.item);
+      continue;
+    }
+    try {
+      await input.api[input.op](p.item.path, p.to, p.kind === 'overwrite');
+      result.done.push(p.item);
+      input.invalidate(p.item.path);
+      input.invalidate(p.to);
+    } catch (e) {
+      result.failed.push({ item: p.item, message: input.errorText(e) });
+    }
+  }
+  return result;
+}
+
+/** 結果の一言（トースト用）。失敗がなければ null */
+export function transferFailure(result: TransferResult): string | null {
+  if (result.failed.length === 0) return null;
+  const first = result.failed[0];
+  const more = result.failed.length > 1 ? `（ほか ${result.failed.length - 1} 件）` : '';
+  return `「${first.item.name ?? baseName(first.item.path)}」: ${first.message}${more}`;
+}
