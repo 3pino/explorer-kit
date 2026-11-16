@@ -2,11 +2,12 @@
 
 ファイルエクスプローラーの共有の部品（Svelte 5）。[disnans](https://github.com/3pino/disnans) の共有フォルダの画面と、disrect（ファイラー）が同じものを使います。
 
-- **画面**: `FileExplorer.svelte`（一覧・アイコン表示・選択・コピー／切り取り／貼り付け・ドラッグ・名前の変更・ゴミ箱・外からの取り込み）、`FileProperties.svelte`、`EntryActions.svelte`
+- **画面**: `FileExplorer.svelte`（一覧・アイコン表示・選択・コピー／切り取り／貼り付け・ドラッグ・名前の変更・ゴミ箱・外からの取り込み）、`FileProperties.svelte`、`EntryActions.svelte`。ボタン・メニュー・ダイアログなどの小さな部品は [@3pino/ui-kit](https://github.com/3pino/ui-kit) のもの
 - **決まり**（見た目を持たない）: 名前・同名の扱い（`ops`）、移動とコピーの進め方（`transfer`）、ゴミ箱の仮想フォルダ（`trashFolder`）、並び順（`listing`）、フォルダごとの表示（`dirs`）
 - **状態**: 開いているフォルダ（`ExplorerNav`）・一覧の写し（`DirIndex`）・選択・切り取り／コピーの控え・表示方法
 
 見た目は [@3pino/design-system](https://github.com/3pino/design-system) の CSS を前提にしています（取り込む側のアプリが読み込む）。
+取り込む側は、`@3pino/ui-kit` も依存に入れてください（peer です）。
 
 ## 2 つの口
 
@@ -29,7 +30,7 @@ npm install github:3pino/explorer-kit#v0.1.0
 開発サーバーの依存の事前バンドルは JS だけを想定しているので、取り込む側の `vite.config.ts` で外してください。
 
 ```ts
-optimizeDeps: { exclude: ['@3pino/explorer-kit'] },
+optimizeDeps: { exclude: ['@3pino/explorer-kit', '@3pino/ui-kit'] },
 ```
 
 ```ts

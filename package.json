@@ -1,6 +1,6 @@
 {
   "name": "@3pino/explorer-kit",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "ファイルエクスプローラーの共有の部品（disnans・disrect）。Svelte 5 の部品と、その決まり・状態",
   "type": "module",
   "svelte": "./src/index.ts",
@@ -15,11 +15,13 @@
     "test": "vitest run"
   },
   "peerDependencies": {
+    "@3pino/ui-kit": ">=0.1.0",
     "@lucide/svelte": "^1.53.0",
     "svelte": "^5.57.0"
   },
   "devDependencies": {
     "@3pino/design-system": "git+https://github.com/3pino/design-system.git#v0.4.1",
+    "@3pino/ui-kit": "git+https://github.com/3pino/ui-kit.git#v0.1.0",
     "@lucide/svelte": "^1.53.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tsconfig/svelte": "^5.0.8",

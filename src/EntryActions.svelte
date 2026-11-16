@@ -4,9 +4,9 @@
   import { entryLabel } from './trashFolder';
   import type { Entry } from './types';
   import type { Explorer } from './explorer';
-  import IconButton from './ui/IconButton.svelte';
-  import Menu from './ui/Menu.svelte';
-  import MenuItem from './ui/MenuItem.svelte';
+  import IconButton from '@3pino/ui-kit/IconButton.svelte';
+  import Menu from '@3pino/ui-kit/Menu.svelte';
+  import MenuItem from '@3pino/ui-kit/MenuItem.svelte';
   import FileProperties from './FileProperties.svelte';
 
   // 項目の「…」: プロパティだけ。名前の変更は一覧の名前を押して行い、
