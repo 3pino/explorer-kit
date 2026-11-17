@@ -14,18 +14,18 @@
   import Copy from '@lucide/svelte/icons/copy';
   import Scissors from '@lucide/svelte/icons/scissors';
   import Trash from '@lucide/svelte/icons/trash';
-  import IconButton from '@3pino/ui-kit/IconButton.svelte';
-  import PanelBar from '@3pino/ui-kit/PanelBar.svelte';
-  import Button from '@3pino/ui-kit/Button.svelte';
-  import Modal from '@3pino/ui-kit/Modal.svelte';
-  import TextInput from '@3pino/ui-kit/TextInput.svelte';
+  import IconButton from '@3pino/ui-kit-web/IconButton.svelte';
+  import PanelBar from '@3pino/ui-kit-web/PanelBar.svelte';
+  import Button from '@3pino/ui-kit-web/Button.svelte';
+  import Modal from '@3pino/ui-kit-web/Modal.svelte';
+  import TextInput from '@3pino/ui-kit-web/TextInput.svelte';
 
   import EntryActions from './EntryActions.svelte';
   import Check from '@lucide/svelte/icons/check';
   import MenuIcon from '@lucide/svelte/icons/menu';
   import RotateCcw from '@lucide/svelte/icons/rotate-ccw';
-  import Menu from '@3pino/ui-kit/Menu.svelte';
-  import MenuItem from '@3pino/ui-kit/MenuItem.svelte';
+  import Menu from '@3pino/ui-kit-web/Menu.svelte';
+  import MenuItem from '@3pino/ui-kit-web/MenuItem.svelte';
   import { breadcrumbs, entryAction, kindLabel, sortEntries } from './listing';
   import type { ViewMode } from './stores/view.svelte';
   import { baseName, parentOf } from './path';

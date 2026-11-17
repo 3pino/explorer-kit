@@ -1,8 +1,8 @@
 <script lang="ts">
   import Copy from '@lucide/svelte/icons/copy';
   import RefreshCw from '@lucide/svelte/icons/refresh-cw';
-  import Modal from '@3pino/ui-kit/Modal.svelte';
-  import Button from '@3pino/ui-kit/Button.svelte';
+  import Modal from '@3pino/ui-kit-web/Modal.svelte';
+  import Button from '@3pino/ui-kit-web/Button.svelte';
   import { formatFull, formatSize } from './format';
   import { kindLabel } from './listing';
   import { entryLabel, trashItemOf } from './trashFolder';
