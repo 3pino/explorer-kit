@@ -10,10 +10,10 @@
   import type { Explorer } from './explorer';
 
   // 項目のプロパティ（読むだけ）。作成日時は出さない（更新日時だけ）。
-  // 名前とパスは押すとコピーする。ファイルには、本体の操作（host.fileAction。Disnans の「メッセージを検索」）を出せる
+  // 名前とパスは押すとコピーする。ファイルには、本体の操作（host.fileAction。例: 「メッセージを検索」）を出せる
   // 。フォルダはサイズを非同期で取得する。見た目は仮
   let { explorer, entry, onclose }: { explorer: Explorer; entry: Entry; onclose: () => void } = $props();
-  /** 本体の操作（Disnans の「メッセージを検索」など）。無ければ出さない */
+  /** 本体の操作（例: 「メッセージを検索」）。無ければ出さない */
   const fileAction = $derived(explorer.host.fileAction);
   const isFile = $derived(entry.kind === 'file');
   /** 名前（ゴミ箱の直下の項目は元の名前。パスは別名のまま、元の場所を別に出す） */

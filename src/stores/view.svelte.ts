@@ -3,7 +3,7 @@ import { inheritedDirView, parseDirViewMap, withDirView, type DirView, type DirV
 import type { SortKey, SortOrder } from '../listing';
 import type { ViewStore } from '../types';
 
-// 一覧の表示方法と並び順。フォルダごとの設定で、保存先は本体が決める（ViewStore。Disnans ではこの端末の設定）。
+// 一覧の表示方法と並び順。フォルダごとの設定で、保存先は本体が決める（ViewStore）。
 // 決めていないフォルダは、いちばん近い上のフォルダの設定に従う（どこにも無ければ既定: 詳細・名前の昇順）。
 // 保存先の値がリアクティブなら、描画の中で読んだ of() も追従する。
 

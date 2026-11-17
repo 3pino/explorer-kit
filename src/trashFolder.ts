@@ -1,5 +1,5 @@
 // ゴミ箱の仮想フォルダ（`.trash/`）の見え方と決まり。見た目は持たない。置き場所が一覧に印（Entry.trash）を入れたときだけ働く。
-// 中身の種類は、サーバーが一覧の `trash` に入れた印（Entry.trash）で決める。パスや名前から推測しない。
+// 中身の種類は、置き場所が一覧の `trash` に入れた印（Entry.trash）で決める。パスや名前から推測しない。
 //  - root: `.trash/` そのもの（一覧の '' に出る）。コピー・移動・削除・名前の変更はできない
 //  - item: `.trash/<ID>--<元の名前>` の直下の 1 件（ゴミ箱の 1 件）。元の名前は entry.original_path から出す。
 //          読む・コピー（元の名前で）・元へ戻す・完全削除ができる。名前は変えられない
@@ -9,7 +9,7 @@
 import type { DirState, Entry, TrashEntry } from './types';
 import { baseName, parentOf } from './path';
 
-/** 仮想のゴミ箱フォルダの名前（共有フォルダの直下） */
+/** 仮想のゴミ箱フォルダの名前（いちばん上の直下） */
 export const TRASH_ROOT = '.trash';
 
 /** 直下の 1 件（ゴミ箱の項目）の元の名前。ほかの項目は、名前そのもの */
@@ -48,7 +48,7 @@ export function trashPlace(e: Entry): TrashPlace {
  * - root: `.trash/` そのもの
  * - inside: `.trash/` の中（1 件の中身を含む）
  * - unknown: `.trash/` の中かもしれないが、まだ確かめられない（書き込みは止める）
- * 判定は、共有フォルダの直下の一覧にある `.trash` の印（trash.kind === 'root'）で決める。
+ * 判定は、いちばん上の直下の一覧にある `.trash` の印（trash.kind === 'root'）で決める。
  * root の一覧（rootState）が手元に無いときは、`.trash` の下なら unknown。
  */
 export type VirtualDir = 'normal' | 'root' | 'inside' | 'unknown';

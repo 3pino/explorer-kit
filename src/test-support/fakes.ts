@@ -10,8 +10,8 @@ export const file = (path: string, size = 1): Entry => ({
 });
 export const dir = (path: string): Entry => ({ ...file(path, 0), kind: 'dir' });
 
-/** 添付のフォルダの無い、ふつうの置き場所の決まり */
-export const PLAIN_RULES: Rules = { attachmentsDir: null, nameError: (_dir, name) => basicNameError(name) };
+/** 特別なフォルダの無い、ふつうの置き場所の決まり */
+export const PLAIN_RULES: Rules = { specialDir: null, nameError: (_dir, name) => basicNameError(name) };
 
 export function fakeApi(initial: Entry[]): ExplorerApi & { tree: Map<string, Entry> } {
   const tree = new Map(initial.map((e) => [e.path, e]));

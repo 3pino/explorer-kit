@@ -1,15 +1,17 @@
 // 書き込みの決まり（名前・確認の文・同名の扱い）。見た目は持たない。
-// 置き場所ごとの違い（添付のフォルダ・名前の決まり）は Rules で受け取る。
-// 添付（Disnans の attachments/ の中）は本文のリンクと結びつくので、確認の文にその旨を入れる。
+// 置き場所ごとの違い（特別なフォルダ・名前の決まり・文）は Rules で受け取る。
 
-import type { Entry, Rules } from './types';
+import type { Entry, RuleTexts, Rules } from './types';
 import { baseName, childPath, parentOf } from './path';
 
 export { childPath };
 
-/** 添付のフォルダそのものか、その中か（添付の決まりが掛かる）。添付のフォルダが無い置き場所では、いつも false */
-export function inAttachments(rules: Rules, path: string): boolean {
-  const dir = rules.attachmentsDir;
+/** ドラッグで運ぶ項目の印（DataTransfer の種類）。ほかのアプリのドロップ先が、この部品のドラッグかを見分けるのに使う */
+export const EXPLORER_DRAG_TYPE = 'application/x-explorer-kit-items';
+
+/** 特別なフォルダそのものか、その中か（特別なフォルダの決まりが掛かる）。特別なフォルダが無い置き場所では、いつも false */
+export function inSpecialDir(rules: Rules, path: string): boolean {
+  const dir = rules.specialDir;
   return dir !== null && (path === dir || path.startsWith(dir + '/'));
 }
 
@@ -21,15 +23,29 @@ export function basicNameError(name: string): string | null {
   return null;
 }
 
-/** 添付のフォルダそのものの理由。動かせない・消せない */
-export const RESERVED_REASON = '添付のフォルダは動かせません';
+/** 特別なフォルダそのものの理由（既定の文）。動かせない・消せない */
+export const RESERVED_REASON = 'このフォルダは動かせません';
+
+/** 置き場所の文（Rules.texts）に、一般の文を補う */
+export function ruleTexts(rules: Rules): Required<Omit<RuleTexts, 'trashNote' | 'overwriteBody'>> & Pick<RuleTexts, 'trashNote' | 'overwriteBody'> {
+  const t = rules.texts ?? {};
+  return {
+    root: t.root ?? 'いちばん上',
+    reserved: t.reserved ?? RESERVED_REASON,
+    crossMove: t.crossMove ?? 'このフォルダの中と外の間は移動できません（コピーしてください）',
+    noSubfolder: t.noSubfolder ?? 'このフォルダの中にはフォルダを作れません',
+    cutSkipped: t.cutSkipped ?? (rules.specialDir === null ? 'ゴミ箱のフォルダは動かせないので除きました' : 'このフォルダ・ゴミ箱のフォルダは動かせないので除きました'),
+    trashNote: t.trashNote,
+    overwriteBody: t.overwriteBody,
+  };
+}
 
 /** 項目の操作（名前の変更・切り取り・削除）が、今できるか。できないときは理由 */
 export type Allowed = { ok: true } | { ok: false; message: string };
 
-/** 項目の名前の変更・削除の可否（添付のフォルダそのものだけ不可） */
+/** 項目の名前の変更・削除の可否（特別なフォルダそのものだけ不可） */
 export function renameAllowed(rules: Rules, path: string): Allowed {
-  return rules.attachmentsDir !== null && path === rules.attachmentsDir ? { ok: false, message: RESERVED_REASON } : { ok: true };
+  return rules.specialDir !== null && path === rules.specialDir ? { ok: false, message: ruleTexts(rules).reserved } : { ok: true };
 }
 
 /** 複数の項目をゴミ箱に移す確認の文。restorable が偽（戻す操作が無い置き場所）なら、戻せるとは書かない */
@@ -40,28 +56,27 @@ export function trashManyConfirm(
 ): { title: string; body: string; okLabel: string; danger: true } {
   const n = items.length;
   const notes: string[] = [];
-  if (items.some((i) => inAttachments(rules, i.path))) notes.push('添付のものは、本文のリンクが「削除されたファイル」になります');
+  const note = ruleTexts(rules).trashNote;
+  if (note && items.some((i) => inSpecialDir(rules, i.path))) notes.push(note);
   notes.push(restorable ? 'ゴミ箱から元に戻せます' : 'OS のゴミ箱から元に戻せます');
   return { title: `${n} 件をゴミ箱に移しますか`, body: notes.join('。'), okLabel: 'ゴミ箱に移す', danger: true };
 }
 
-/** 同名のファイルを上書きする確認の文（必ず確認する）。添付の中は、本文の表示も新しい中身になる */
+/** 同名のファイルを上書きする確認の文（必ず確認する）。特別なフォルダの中は、置き場所の文（Rules.texts.overwriteBody）があればそれ */
 export function overwriteConfirm(rules: Rules, path: string): { title: string; body: string; okLabel: string; danger: true } {
   const name = baseName(path);
   return {
     title: `「${name}」を上書きしますか`,
-    body: inAttachments(rules, path)
-      ? '同じ添付の中身が入れ替わります。本文の表示も新しい中身になります。元に戻せません'
-      : '今のファイルは消えて、新しいものに入れ替わります。元に戻せません',
+    body: (inSpecialDir(rules, path) && ruleTexts(rules).overwriteBody) || '今のファイルは消えて、新しいものに入れ替わります。元に戻せません',
     okLabel: '上書き',
     danger: true,
   };
 }
 
-/** 一覧の中の、同じ名前の項目。添付の中は大文字・小文字を区別しない（添付の別名の決まり） */
+/** 一覧の中の、同じ名前の項目。特別なフォルダの中は大文字・小文字を区別しない */
 export function sameNameEntry(rules: Rules, entries: ReadonlyMap<string, Entry>, dir: string, name: string): Entry | undefined {
   const exact = entries.get(name);
-  if (exact || !inAttachments(rules, dir)) return exact;
+  if (exact || !inSpecialDir(rules, dir)) return exact;
   const lower = name.toLowerCase();
   for (const [k, v] of entries) if (k.toLowerCase() === lower) return v;
   return undefined;

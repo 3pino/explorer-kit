@@ -23,11 +23,11 @@ describe('checkTransfer（サーバーの決まりと同じ）', () => {
     expect(checkTransfer('move', f('a.txt'), 'docs').ok).toBe(true);
     expect(checkTransfer('copy', f('a.txt'), 'docs').ok).toBe(true);
   });
-  it('共有フォルダと attachments/ の間は移動できない（コピーは可）', () => {
-    expect(checkTransfer('move', f('a.txt'), 'attachments')).toMatchObject({ ok: false });
-    expect(checkTransfer('move', f('attachments/x.png'), 'docs')).toMatchObject({ ok: false });
-    expect(checkTransfer('copy', f('a.txt'), 'attachments').ok).toBe(true);
-    expect(checkTransfer('copy', f('attachments/x.png'), 'docs').ok).toBe(true);
+  it('特別なフォルダの内外の間は移動できない（コピーは可）', () => {
+    expect(checkTransfer('move', f('a.txt'), 'special')).toMatchObject({ ok: false });
+    expect(checkTransfer('move', f('special/x.png'), 'docs')).toMatchObject({ ok: false });
+    expect(checkTransfer('copy', f('a.txt'), 'special').ok).toBe(true);
+    expect(checkTransfer('copy', f('special/x.png'), 'docs').ok).toBe(true);
   });
   it('フォルダをコピーできる（他の場所へ）', () => {
     expect(checkTransfer('copy', d('docs'), 'other').ok).toBe(true);
@@ -44,8 +44,8 @@ describe('checkTransfer（サーバーの決まりと同じ）', () => {
     expect(checkTransfer('copy', d('docs'), 'docs/sub')).toMatchObject({ ok: false });
     expect(checkTransfer('copy', d('docs'), 'docsx').ok).toBe(true);
   });
-  it('attachments/ そのものは動かせない', () => {
-    expect(checkTransfer('move', d('attachments'), 'docs')).toMatchObject({ ok: false });
+  it('special/ そのものは動かせない', () => {
+    expect(checkTransfer('move', d('special'), 'docs')).toMatchObject({ ok: false });
   });
 });
 
@@ -68,17 +68,17 @@ describe('planTransfer', () => {
     expect(planTransfer('copy', [f('a.txt')], 'y', null)[0]).toMatchObject({ kind: 'blocked' });
   });
   it('名前は、置き場所の決まり（Rules.nameError）で見る', () => {
-    const strict = { ...RULES, nameError: (dir: string, name: string) => (dir === 'attachments' && name.includes('[') ? '使えない文字' : null) };
-    expect(kit.planTransfer(strict, 'copy', [f('docs/a[1].png')], 'attachments', entries())[0]).toMatchObject({ kind: 'blocked', message: '使えない文字' });
-    expect(kit.planTransfer(strict, 'copy', [f('docs/a (1).png')], 'attachments', entries())[0].kind).toBe('create');
+    const strict = { ...RULES, nameError: (dir: string, name: string) => (dir === 'special' && name.includes('[') ? '使えない文字' : null) };
+    expect(kit.planTransfer(strict, 'copy', [f('docs/a[1].png')], 'special', entries())[0]).toMatchObject({ kind: 'blocked', message: '使えない文字' });
+    expect(kit.planTransfer(strict, 'copy', [f('docs/a (1).png')], 'special', entries())[0].kind).toBe('create');
     expect(kit.planTransfer(strict, 'copy', [f('docs/a[1].png')], 'docs2', entries())[0].kind).toBe('create');
   });
-  it('attachments/ の中では大文字・小文字の違う同名を上書きとして扱い、先は既存の名前に合わせる', () => {
-    const plan = planTransfer('copy', [f('docs/A.png')], 'attachments', entries(entry('attachments/a.png')));
-    expect(plan[0]).toMatchObject({ kind: 'overwrite', to: 'attachments/a.png' });
+  it('special/ の中では大文字・小文字の違う同名を上書きとして扱い、先は既存の名前に合わせる', () => {
+    const plan = planTransfer('copy', [f('docs/A.png')], 'special', entries(entry('special/a.png')));
+    expect(plan[0]).toMatchObject({ kind: 'overwrite', to: 'special/a.png' });
   });
-  it('同じ項目の場所（attachments/ の中）は、何もしない（上書きにしない）', () => {
-    const plan = planTransfer('move', [f('attachments/a.png')], 'attachments', entries(entry('attachments/a.png')));
+  it('同じ項目の場所（special/ の中）は、何もしない（上書きにしない）', () => {
+    const plan = planTransfer('move', [f('special/a.png')], 'special', entries(entry('special/a.png')));
     expect(plan[0].kind).toBe('skip');
   });
 });
@@ -143,12 +143,12 @@ describe('runTransfer', () => {
     expect(transferFailure(r)).toContain('a.txt');
   });
 
-  it('決まりに合わない項目（添付との間の移動）は送らず failed に入れる', async () => {
+  it('決まりに合わない項目（特別なフォルダとの間の移動）は送らず failed に入れる', async () => {
     const a = api();
     const r = await runTransfer({
       op: 'move',
       items: [f('docs/a.txt')],
-      destDir: 'attachments',
+      destDir: 'special',
       destEntries: entries(),
       confirm: async () => true,
       api: a,
@@ -198,9 +198,9 @@ describe('ゴミ箱の項目（仮想フォルダ）の移動・コピー', () =
     expect(c.ok).toBe(false);
   });
 
-  it('attachments の項目は、attachments へ戻せる（添付と共有の間の決まりは掛けない）', () => {
-    const att = item('.trash/01HZX0000000000000000000AB--F1.png', 'attachments/F1.png', 'F1.png');
-    expect(checkTransfer('move', att, 'attachments')).toEqual({ ok: true });
+  it('special の項目は、special へ戻せる（内外の間の決まりは掛けない）', () => {
+    const att = item('.trash/01HZX0000000000000000000AB--F1.png', 'special/F1.png', 'F1.png');
+    expect(checkTransfer('move', att, 'special')).toEqual({ ok: true });
   });
 
   it('同じ名前があるときは、戻せない（上書きしない）。コピーは確認して上書き', () => {

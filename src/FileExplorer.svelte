@@ -29,7 +29,7 @@
   import { breadcrumbs, entryAction, kindLabel, sortEntries } from './listing';
   import type { ViewMode } from './stores/view.svelte';
   import { baseName, parentOf } from './path';
-  import { childPath, inAttachments, overwriteConfirm, planUpload, renameAllowed, renameTarget, sameNameEntry, trashManyConfirm } from './ops';
+  import { childPath, EXPLORER_DRAG_TYPE, inSpecialDir, overwriteConfirm, planUpload, renameAllowed, renameTarget, ruleTexts, sameNameEntry, trashManyConfirm } from './ops';
   import { runTransfer, transferFailure, type TransferItem, type TransferOp } from './transfer';
   import { TRASH_ROOT, displayEntry, entryLabel, trashItemOf, trashPlace, virtualDir, writeBlockReason } from './trashFolder';
   import { allWholeTrash, copyBlockedReason, cutBlockedReason, deleteBlockedReason, transferItemOf } from './selection';
@@ -52,7 +52,7 @@
   /** 長押しとみなす時間（ms） */
   const LONG_PRESS_MS = 400;
 
-  // 共有フォルダの中身を見るパネル（閲覧だけ。書き込み・削除はしない）。見た目は仮（利用者の確認を取る）。
+  // 置き場所の中身を見るパネル（閲覧だけ。書き込み・削除はしない）。見た目は仮（利用者の確認を取る）。
   // フォルダは中へ、画像は拡大表示、ほかのファイルはリンクで開く・保存する（明示的に押したときだけ）。
   // 一覧は sharedIndex の写し。files.changed で捨てられたら、ここで読み直す。
   const listing = $derived(fileExplorer.state);
@@ -161,8 +161,8 @@
   let uploadSeq = 0;
   let fileInput: HTMLInputElement | undefined = $state();
 
-  /** attachments/ の中では新しいフォルダは作れない（中はファイルだけ） */
-  const canCreateFolder = $derived(!inAttachments(rules, fileExplorer.dir) && writeBlockReason(vdir) === null);
+  /** 特別なフォルダ（Rules.specialDir）の中では新しいフォルダは作れない（中はファイルだけ） */
+  const canCreateFolder = $derived(!inSpecialDir(rules, fileExplorer.dir) && writeBlockReason(vdir) === null);
 
   function dropUpload(key: number): void {
     const u = uploads.find((x) => x.key === key);
@@ -170,16 +170,20 @@
     uploads = uploads.filter((x) => x.key !== key);
   }
 
-  // ---- 送る・移す・消す・戻すの範囲（サーバー） ----
-  // 操作を始めたときのサーバーを覚える。確認や応答を待つあいだにサーバーが変わったら、新しいサーバーへは書かない。
-  // 変わったあとは、新しいサーバーの一覧の写し・選択には触らない（前のサーバーの結果は、その分だけ扱う）。
+  // ---- 送る・移す・消す・戻すの範囲（置き場所） ----
+  // 操作を始めたときの置き場所を覚える。確認や応答を待つあいだに置き場所が変わったら、新しい置き場所へは書かない。
+  // 変わったあとは、新しい置き場所の一覧の写し・選択には触らない（前の置き場所の結果は、その分だけ扱う）。
 
-  /** サーバーが変わったときの文（操作を止めた理由） */
-  const SERVER_CHANGED = 'サーバーが変わったため、ここで止めました';
+  /** 置き場所の呼び名（labels.scope。既定 '置き場所'） */
+  const scopeName = labels.scope ?? '置き場所';
+  /** 置き場所が変わったときの文（操作を止めた理由） */
+  const SERVER_CHANGED = `${scopeName}が変わったため、ここで止めました`;
+  /** 置き場所が変わってアップロードを止めたときの文 */
+  const UPLOAD_SCOPE_CHANGED = `${scopeName}が変わったためアップロードを中止しました`;
 
   type Scope = { url: string; alive: () => boolean };
 
-  /** 今のサーバーを覚える。alive() は、覚えたサーバーのままかを返す */
+  /** 今の置き場所を覚える。alive() は、覚えた置き場所のままかを返す */
   function beginScope(): Scope {
     const url = scopeSource.key();
     return { url, alive: () => scopeSource.key() === url };
@@ -218,7 +222,7 @@
   /** 送る 1 回分（複数件）の宛先。一覧は最初に 1 回だけ取る。成功したものは写しに足して、後続の同名の確認に使う */
   type Batch = { dir: string; scope: Scope; entries: Map<string, Entry> };
 
-  /** 宛先の一覧を用意する（未読なら取り直す）。範囲は今のサーバー。取れない・サーバーが変わったら null */
+  /** 宛先の一覧を用意する（未読なら取り直す）。範囲は今の置き場所。取れない・置き場所が変わったら null */
   async function beginBatch(dir: string): Promise<Batch | null> {
     const why = writeBlock(dir);
     if (why) {
@@ -245,7 +249,7 @@
     if (batch) await sendAll(batch, picked);
   }
 
-  /** 並んだ件を順に送る。範囲（サーバー）が変わったら、残りは送らない（変わったことは sendOne が知らせる） */
+  /** 並んだ件を順に送る。範囲（置き場所）が変わったら、残りは送らない（変わったことは sendOne が知らせる） */
   async function sendAll(batch: Batch, files: File[]): Promise<(string | null)[]> {
     const sent: (string | null)[] = [];
     for (const file of files) {
@@ -287,7 +291,7 @@
       dropUpload(row.key);
       return null;
     }
-    // 確認を待つあいだにサーバーが変わっていたら、送らない
+    // 確認を待つあいだに置き場所が変わっていたら、送らない
     if (!scope.alive()) {
       dropUpload(row.key);
       host.toast(SERVER_CHANGED, 'error');
@@ -299,14 +303,14 @@
       await h.promise;
       dropUpload(row.key);
       if (!scope.alive()) {
-        // 送ったのは前のサーバー。新しいサーバーの一覧の写しには触らない
+        // 送ったのは前の置き場所。新しい置き場所の一覧の写しには触らない
         host.toast(SERVER_CHANGED, 'error');
         return null;
       }
       sharedIndex.invalidate(plan.path);
       if (batch) {
         const name = baseName(plan.path);
-        batch.entries.set(name, { name, path: plan.path, kind: 'file', size: file.size, modified: Date.now(), mime: file.type || null, message_id: null, file_id: null });
+        batch.entries.set(name, { name, path: plan.path, kind: 'file', size: file.size, modified: Date.now(), mime: file.type || null, });
       }
       return plan.path;
     } catch (err) {
@@ -349,7 +353,7 @@
   onMount(() => {
     // 戻るの履歴は、パネルを開いたところから数える
     fileExplorer.forgetHistory();
-    // サーバーが変わったら、進んでいる選びの操作の印を外す（古い操作の終わりは、新しい操作の印に触らない）
+    // 置き場所が変わったら、進んでいる選びの操作の印を外す（古い操作の終わりは、新しい操作の印に触らない）
     const unsubServer = scopeSource.onChange(() => {
       action = null;
     });
@@ -415,7 +419,7 @@
         try {
           const { entries, skipped } = await host.osDrop.entries(id);
           if (scopeSource.key() !== serverUrl) {
-            host.toast('サーバーが変わったためアップロードを中止しました', 'error');
+            host.toast(UPLOAD_SCOPE_CHANGED, 'error');
             return;
           }
           if (skipped.length > 0) host.toast(`読み込めなかった項目があります（${skipped[0]}${skipped.length > 1 ? ' ほか' : ''}）`, 'error');
@@ -582,7 +586,7 @@
   /** 選んだ項目に、コピーできないもの（ゴミ箱のフォルダ）があれば、その理由 */
   const copyBlocked = $derived(copyBlockedReason(selectedItems));
 
-  /** 選んだ項目に、切り取りできないもの（添付のフォルダ・ゴミ箱のフォルダや中身など）があれば、その理由。ゴミ箱の直下の項目は切り取れる（貼り付けで元の場所だけ）。 */
+  /** 選んだ項目に、切り取りできないもの（特別なフォルダ・ゴミ箱のフォルダや中身など）があれば、その理由。ゴミ箱の直下の項目は切り取れる（貼り付けで元の場所だけ）。 */
   const cutBlocked = $derived(cutBlockedReason(rules, selectedItems));
   /** 選んだ項目を削除できない理由。ゴミ箱のフォルダ・中身は消せない。ゴミ箱の項目は完全削除（ふつうの項目と混ぜない） */
   const deleteBlocked = $derived(deleteBlockedReason(rules, selectedEntries, selectedItems));
@@ -590,9 +594,9 @@
   /** 選んだ項目をコピー・切り取りする（できたことは、貼り付けが押せるようになることで分かるので通知は出さない） */
   function copySelected(): void {
     const items = selectedItems;
-    // attachments/ そのものと、ゴミ箱のフォルダは動かせないので除く（フォルダのコピーは可）
-    const allowed = items.filter((i) => i.path !== rules.attachmentsDir && i.trash?.where !== 'root');
-    if (allowed.length < items.length) host.toast('添付・ゴミ箱のフォルダは動かせないので除きました');
+    // 特別なフォルダそのものと、ゴミ箱のフォルダは動かせないので除く（フォルダのコピーは可）
+    const allowed = items.filter((i) => i.path !== rules.specialDir && i.trash?.where !== 'root');
+    if (allowed.length < items.length) host.toast(ruleTexts(rules).cutSkipped);
     if (allowed.length === 0) return;
     explorerBuffer.set('copy', allowed);
     syncToClipboard();
@@ -615,8 +619,8 @@
   }
 
   /**
-   * ゴミ箱の項目を、1 件ずつ元へ戻す・完全に削除する（選んだものを押した時点のサーバーで）。
-   * 各項目の前と応答のあとにサーバーが変わっていないか確かめる。変わったら以後は送らず、新しいサーバーの選びや一覧には触らない。
+   * ゴミ箱の項目を、1 件ずつ元へ戻す・完全に削除する（選んだものを押した時点の置き場所で）。
+   * 各項目の前と応答のあとに置き場所が変わっていないか確かめる。変わったら以後は送らず、新しい置き場所の選びや一覧には触らない。
    * 成功したものだけ一覧から外す（選びも外す）。失敗したものは選んだまま残す。
    */
   async function wholeBatch(
@@ -663,7 +667,7 @@
   /**
    * 選んだ項目への操作（削除・元へ戻す・完全削除。確認の途中も含む）は、同時に 1 つだけ。
    * 進んでいるあいだの押しは何もしない（確認を重ねて出さない・二重に送らない）。終わったら、自分の分だけ外す（token）。
-   * サーバーが変わると外す（古い操作は、終わっても新しい操作の状態に触らず、新しいサーバーの選びにも触らない）。
+   * 置き場所が変わると外す（古い操作は、終わっても新しい操作の状態に触らず、新しい置き場所の選びにも触らない）。
    */
   let action = $state<{ token: number } | null>(null);
   let actionSeq = 0;
@@ -721,7 +725,7 @@
   async function deleteSelectedOnce(): Promise<void> {
     const items = selectedItems;
     if (items.length === 0 || deleteBlocked) return;
-    // 範囲（サーバー）は、選んで押したときのもの。確認を待つあいだに変わったら、何も移さない
+    // 範囲（置き場所）は、選んで押したときのもの。確認を待つあいだに変わったら、何も移さない
     const scope = beginScope();
     if (!(await host.confirm(trashManyConfirm(rules, items, explorer.caps.restore)))) return;
     if (!scope.alive()) {
@@ -731,7 +735,7 @@
     const failed: string[] = [];
     const succeeded: { id: string; path: string }[] = [];
     for (const i of items) {
-      // 次の項目を移す前に、サーバーが変わっていないか確かめる（変わったら残りは移さない）
+      // 次の項目を移す前に、置き場所が変わっていないか確かめる（変わったら残りは移さない）
       if (!scope.alive()) break;
       try {
         const trashed = await sharedApi.trash(i.path);
@@ -742,14 +746,14 @@
       }
     }
     const changed = !scope.alive();
-    // 新しいサーバーの選択には触らない
+    // 新しい置き場所の選択には触らない
     if (!changed) explorerSelection.clear();
     if (succeeded.length > 0) {
       // ゴミ箱に移した項目をバッファからも除去（cut済み→trash→pasteでnot_foundにならないよう）
       if (!changed) explorerBuffer.remove(succeeded.map((s) => s.path));
       // 成功したIDの不変スナップショット（この一括操作だけが対象、過去/他ユーザーの削除はundoしない）
       const ids = succeeded.map((s) => s.id);
-      // 取り消しは、削除したサーバーへだけ送る（restoreBatch が確かめる）
+      // 取り消しは、削除した置き場所へだけ送る（restoreBatch が確かめる）
       const trashServerUrl = scope.url;
       // 「取り消す」は、この部品から元へ戻せる置き場所だけ
       const undo = explorer.caps.restore
@@ -764,7 +768,7 @@
   /**
    * ゴミ箱の取り消し（削除直後のトーストから呼ぶ）。
    * - このセッションで成功した ID だけを対象にする（スナップショット）
-   * - 戻す直前と応答のあとに、削除したサーバーのままかを確かめる。変わったら、以後は戻さず投げる
+   * - 戻す直前と応答のあとに、削除した置き場所のままかを確かめる。変わったら、以後は戻さず投げる
    * - 失敗した項目の ID は undo の対象に入れていないため、失敗は維持される
    */
   async function restoreBatch(ids: string[], serverUrl: string): Promise<void> {
@@ -910,7 +914,7 @@
   let renameError = $state<string | null>(null);
   let renameBusy = $state(false);
 
-  /** 名前を変えられない理由（ゴミ箱の中の項目・添付のフォルダ・書けない場所）。変えられるなら null */
+  /** 名前を変えられない理由（ゴミ箱の中の項目・特別なフォルダ・書けない場所）。変えられるなら null */
   function renameBlock(e: Entry): string | null {
     const place = trashPlace(e);
     if (place !== 'normal') return 'ゴミ箱の中の項目は名前を変えられません';
@@ -1020,7 +1024,7 @@
     const items = explorerSelection.active && explorerSelection.has(e.path) ? selectedItems : [item];
     dragItems = items;
     ev.dataTransfer!.effectAllowed = 'copyMove';
-    ev.dataTransfer!.setData('application/x-disnans-explorer', items.map((i) => i.path).join('|'));
+    ev.dataTransfer!.setData(EXPLORER_DRAG_TYPE, items.map((i) => i.path).join('|'));
   }
 
   function endItemDrag(): void {
@@ -1029,7 +1033,7 @@
   }
 
   function isInternalDrag(ev: DragEvent): boolean {
-    return !!ev.dataTransfer?.types.includes('application/x-disnans-explorer');
+    return !!ev.dataTransfer?.types.includes(EXPLORER_DRAG_TYPE);
   }
 
   /** フォルダ項目の上（ドロップ先にできるか確認してハイライト） */
@@ -1115,7 +1119,7 @@
 
   /**
    * 移動・コピーを 1 回で行う（貼り付け・ドラッグ）。宛先の一覧は未読なら取り直す。
-   * 上書きの確認や応答を待つあいだにサーバーが変わったら、新しいサーバーへは何も送らない（残りは移さず、知らせる）。
+   * 上書きの確認や応答を待つあいだに置き場所が変わったら、新しい置き場所へは何も送らない（残りは移さず、知らせる）。
    */
   async function transferInScope(op: TransferOp, items: TransferItem[], destDir: string): Promise<void> {
     const why = writeBlock(destDir);
@@ -1199,7 +1203,7 @@
     if (roots.length === 0) return;
     ev.preventDefault();
     ev.stopPropagation();
-    // destDir と serverUrl は await 前にキャプチャ（ユーザーが await 中にフォルダ/サーバーを変えても意図した先へ）
+    // destDir と serverUrl は await 前にキャプチャ（ユーザーが await 中にフォルダ/置き場所を変えても意図した先へ）
     const destDir = overrideDir ?? fileExplorer.dir;
     const serverUrl = scopeSource.key();
     const entries = await host.osDrop.entriesFromRoots(roots);
@@ -1213,13 +1217,13 @@
    */
   /**
    * OS ドロップ（Windows HTML5 / Linux ネイティブ）の階層アップロード共通処理。
-   * destDir と serverUrl は呼び出し元が await 前に捕捉して渡す（ユーザーが途中でフォルダ移動・サーバー切替しても意図した先へ送る）。
+   * destDir と serverUrl は呼び出し元が await 前に捕捉して渡す（ユーザーが途中でフォルダ移動・置き場所切替しても意図した先へ送る）。
    * 安全方針:
    *  - 宛先一覧が未読・loading・error なら明示取得。失敗なら書込不可
    *  - 根レベルの同名（クロスタイプ含む）・名前エラーは中止
    *  - 根ファイルの上書きは確認
    *  - mkdir はいかなるエラーでも中止（409 exists も「マージ禁止」なので再開しない）
-   *  - 各 write 前にサーバースコープを確認
+   *  - 各 write 前に置き場所スコープを確認
    */
   async function uploadOsDropEntries(entries: OsDropEntry[], destDir: string, serverUrl: string): Promise<void> {
     if (entries.length === 0) return;
@@ -1231,12 +1235,12 @@
 
     // 宛先一覧を取得（fetchDestEntries で キャッシュ / 明示取得を共通化）
     if (scopeSource.key() !== serverUrl) {
-      host.toast('サーバーが変わったためアップロードを中止しました', 'error');
+      host.toast(UPLOAD_SCOPE_CHANGED, 'error');
       return;
     }
     const fetchedEntries = await fetchDestEntries(destDir);
     if (scopeSource.key() !== serverUrl) {
-      host.toast('サーバーが変わったためアップロードを中止しました', 'error');
+      host.toast(UPLOAD_SCOPE_CHANGED, 'error');
       return;
     }
     if (!fetchedEntries) return; // エラーは fetchDestEntries がトースト通知済み
@@ -1249,8 +1253,8 @@
     for (const e of rootEntries) {
       const nameErr = rules.nameError(destDir, e.rel);
       if (nameErr) { host.toast(nameErr, 'error'); return; }
-      const inAttach = inAttachments(rules, destDir);
-      if (inAttach && e.dir) { host.toast('添付フォルダ内にフォルダは作れません', 'error'); return; }
+      const inSpecial = inSpecialDir(rules, destDir);
+      if (inSpecial && e.dir) { host.toast(ruleTexts(rules).noSubfolder, 'error'); return; }
       const same = sameNameEntry(rules, destEntries, destDir, e.rel);
       if (same) {
         if (e.dir) {
@@ -1269,7 +1273,7 @@
             continue;
           }
           if (scopeSource.key() !== serverUrl) {
-            host.toast('サーバーが変わったためアップロードを中止しました', 'error');
+            host.toast(UPLOAD_SCOPE_CHANGED, 'error');
             return;
           }
         }
@@ -1281,7 +1285,7 @@
     for (const e of entries) {
       if (declined.has(e.rel)) continue;
       if (scopeSource.key() !== serverUrl) {
-        host.toast('サーバーが変わったためアップロードを中止しました', 'error');
+        host.toast(UPLOAD_SCOPE_CHANGED, 'error');
         return;
       }
       const path = childPath(destDir, e.rel);
@@ -1298,7 +1302,7 @@
         try {
           const blob = await e.read();
           if (scopeSource.key() !== serverUrl) {
-            host.toast('サーバーが変わったためアップロードを中止しました', 'error');
+            host.toast(UPLOAD_SCOPE_CHANGED, 'error');
             return;
           }
           await sharedApi.write(path, blob);

@@ -23,7 +23,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-function open(entries = [dir('docs'), file('a.txt'), file('docs/inner.txt'), dir('attachments')], host: Partial<ExplorerHost> = {}, caps = {}) {
+function open(entries = [dir('docs'), file('a.txt'), file('docs/inner.txt'), dir('special')], host: Partial<ExplorerHost> = {}, caps = {}) {
   const api = fakeApi(entries);
   let saved: unknown = {};
   const explorer: Explorer = createExplorer({
@@ -44,7 +44,7 @@ describe('エクスプローラーの画面（置き場所と本体は、渡さ�
     const { api, explorer, names } = open();
     await tick();
     expect(api.list).toHaveBeenCalledWith('');
-    expect(names()).toEqual(['attachments', 'docs', 'a.txt']);
+    expect(names()).toEqual(['docs', 'special', 'a.txt']);
     explorer.nav.open('docs');
     await tick();
     expect(names()).toEqual(['inner.txt']);
@@ -62,16 +62,16 @@ describe('エクスプローラーの画面（置き場所と本体は、渡さ�
     expect(toasts).toContainEqual(['1 件をゴミ箱に移しました', 'info', undefined]);
   });
 
-  it('添付のフォルダの無い置き場所では、attachments という名前のフォルダも選んで消せる', async () => {
+  it('特別なフォルダの無い置き場所では、special という名前のフォルダも選んで消せる', async () => {
     const { api, explorer, target } = open();
     await tick();
-    explorer.selection.start('attachments');
+    explorer.selection.start('special');
     flushSync();
     const del = target.querySelector<HTMLButtonElement>('button[aria-label="削除"]')!;
     expect(del.disabled).toBe(false);
     del.click();
     await tick();
-    expect(api.trash).toHaveBeenCalledWith('attachments');
+    expect(api.trash).toHaveBeenCalledWith('special');
   });
 });
 

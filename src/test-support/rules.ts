@@ -1,12 +1,21 @@
 import * as kit from '../index';
 import type { Entry, Rules } from '../types';
 
-// 試験用: 添付のフォルダ（attachments）を持つ置き場所の決まり（Disnans の共有フォルダと同じ形）と、
+// 試験用: 特別なフォルダ（special）を持つ置き場所の決まりと、
 // それを渡して呼ぶ短い書き方。
 
 export const RULES: Rules = {
-  attachmentsDir: 'attachments',
+  specialDir: 'special',
   nameError: (_dir, name) => kit.basicNameError(name),
+  texts: {
+    root: '共有フォルダ',
+    reserved: '特別なフォルダは動かせません',
+    crossMove: '特別なフォルダの内外の間は移動できません（コピーしてください）',
+    noSubfolder: '特別なフォルダ内にフォルダは作れません',
+    cutSkipped: '特別・ゴミ箱のフォルダは動かせないので除きました',
+    trashNote: '特別なフォルダのものは、リンクが切れます',
+    overwriteBody: '同じ特別なフォルダの中身が入れ替わります。元に戻せません',
+  },
 };
 
 export const checkTransfer = (op: kit.TransferOp, item: kit.TransferItem, destDir: string): kit.Check => kit.checkTransfer(RULES, op, item, destDir);

@@ -1,7 +1,7 @@
 import type { Component } from 'svelte';
 
 // 共有の部品が外とやりとりする 2 つの口（置き場所 ExplorerApi・本体から借りる機能 ExplorerHost）と、その上を流れる値。
-// 項目の形（Entry）は Disnans のサーバーの共有フォルダ（SharedEntry）と同じ。ほかの置き場所は、無い欄を null にする。
+// 項目の形（Entry）は、置き場所が違っても同じ。置き場所が持たない欄は null（または省く）にする。
 
 export type EntryKind = 'file' | 'dir';
 
@@ -30,10 +30,10 @@ export type Entry = {
   modified: number;
   /** 種類（分かるときだけ） */
   mime: string | null;
-  /** Disnans の添付だけ */
-  message_id: string | null;
-  /** Disnans の添付だけ */
-  file_id: string | null;
+  /** 置き場所が足す任意の欄（部品は読まない。置き場所が自分の URL を作るときなどに使う）。持たない置き場所は省く */
+  message_id?: string | null;
+  /** 同上 */
+  file_id?: string | null;
   /** ゴミ箱の仮想のフォルダの中の項目だけ */
   trash?: TrashNode;
 };
@@ -44,7 +44,7 @@ export type Size = { size: number; files: number; dirs: number };
 export type UploadHandle = { promise: Promise<unknown>; abort: () => void };
 
 /**
- * 置き場所（Disnans サーバーの共有フォルダ・この端末など）。パスは、いちばん上からの相対（`docs/a.txt`）。
+ * 置き場所（この端末・ネットワークドライブ・サーバーの共有フォルダなど）。パスは、いちばん上からの相対（`docs/a.txt`）。
  * 同名の決まり: write は黙って上書きする（呼ぶ側が先に確かめる）。move・copy は overwrite が真のときだけ、ファイルを置き換える。
  */
 export interface ExplorerApi {
@@ -65,15 +65,42 @@ export interface ExplorerApi {
   upload(path: string, file: Blob, onProgress?: (ratio: number) => void): UploadHandle;
 }
 
-/** 置き場所ごとの決まり（名前・特別なフォルダ） */
-export type Rules = {
-  /** 添付のフォルダ（Disnans の `attachments`。中はファイルだけ・外との間は移動できない）。無ければ null */
-  attachmentsDir: string | null;
-  /** 名前の決まり。使えるなら null、使えないなら理由 */
-  nameError(dir: string, name: string): string | null;
+/**
+ * 特別なフォルダの、利用者へ出す文（すべて省ける。省いたものは、置き場所を問わない一般の文）。
+ * 特別なフォルダが無い置き場所（specialDir が null）では、root 以外は使われない。
+ */
+export type RuleTexts = {
+  /** いちばん上の呼び名。「元の場所（○○の直下）」に使う（既定 'いちばん上'） */
+  root?: string;
+  /** 特別なフォルダそのものは動かせない・消せない、の理由 */
+  reserved?: string;
+  /** 特別なフォルダの中と外の間は移動できない、の理由 */
+  crossMove?: string;
+  /** 特別なフォルダの中にはフォルダを作れない、の理由 */
+  noSubfolder?: string;
+  /** 切り取りで、動かせない項目（特別なフォルダ・ゴミ箱のフォルダ）を除いたことの知らせ */
+  cutSkipped?: string;
+  /** ゴミ箱へ移す確認に足す一文（特別なフォルダの中の項目を含むとき）。無ければ足さない */
+  trashNote?: string;
+  /** 特別なフォルダの中のファイルを上書きする確認の本文。無ければ、ふつうの文 */
+  overwriteBody?: string;
 };
 
-/** 置き場所が変わったか（Disnans では接続先のサーバー）を見分ける口。操作の途中で変わったら、新しい方へは書かない */
+/** 置き場所ごとの決まり（名前・特別なフォルダ） */
+export type Rules = {
+  /**
+   * 特別なフォルダ（いちばん上からの相対パス。例 `attachments`）。無ければ null。
+   * 決まり: フォルダそのものは動かせない・消せない／中にはファイルだけ（フォルダは作れない）／中と外の間は移動できない（コピーはできる）／
+   * 中では、大文字・小文字だけが違う名前を同じ名前として扱う。
+   */
+  specialDir: string | null;
+  /** 名前の決まり。使えるなら null、使えないなら理由 */
+  nameError(dir: string, name: string): string | null;
+  /** 利用者へ出す文（省くと一般の文） */
+  texts?: RuleTexts;
+};
+
+/** 置き場所が変わったか（接続先を切り替えられるサーバーなど）を見分ける口。操作の途中で変わったら、新しい方へは書かない */
 export type ScopeSource = {
   /** いまの置き場所の見分け（同じ文字列なら同じ置き場所） */
   key(): string;
@@ -108,7 +135,7 @@ export type NativeDropEvent = { type: 'enter' | 'over' | 'drop' | 'leave'; paths
 export type OsDropEvent = { id: number | null; error?: string | null; position: { x: number; y: number } | null };
 
 /**
- * 本体（disnans・disrect）から借りる機能。部品は、通知や確認の出し方・クリップボードの読み方・この端末の種類を自分では決めない。
+ * 本体（この部品を使うアプリ）から借りる機能。部品は、通知や確認の出し方・クリップボードの読み方・この端末の種類を自分では決めない。
  */
 export interface ExplorerHost {
   toast(text: string, kind?: ToastKind, action?: ToastAction): unknown;
@@ -156,7 +183,7 @@ export interface ExplorerHost {
   };
   /** PDF のサムネイルを描く部品（無ければ、アイコンを出す） */
   PdfThumb?: Component<{ url: string; key: string }>;
-  /** ファイルのプロパティに出す、本体の操作（Disnans の「メッセージを検索」など）。無ければ出さない */
+  /** ファイルのプロパティに出す、本体の操作（例: 「メッセージを検索」）。無ければ出さない */
   fileAction?: { label: string; icon: Component<{ size?: number; class?: string }>; run(entry: Entry, label: string): void };
 }
 

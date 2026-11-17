@@ -25,7 +25,7 @@ export function copyBlockedReason(items: readonly TransferItem[]): string | null
   return items.some((i) => i.trash?.where === 'root') ? 'ゴミ箱のフォルダはコピーできません' : null;
 }
 
-/** 選んだ項目に、切り取りできないもの（添付のフォルダ・ゴミ箱のフォルダや中身など）があれば、その理由。ゴミ箱の直下の項目は切り取れる（貼り付けで元の場所だけ） */
+/** 選んだ項目に、切り取りできないもの（特別なフォルダ・ゴミ箱のフォルダや中身など）があれば、その理由。ゴミ箱の直下の項目は切り取れる（貼り付けで元の場所だけ） */
 export function cutBlockedReason(rules: Rules, items: readonly TransferItem[]): string | null {
   return (
     items

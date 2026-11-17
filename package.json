@@ -1,6 +1,6 @@
 {
   "name": "@3pino/explorer-kit",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "ファイルエクスプローラーの共有の部品（disnans・disrect）。Svelte 5 の部品と、その決まり・状態",
   "type": "module",
   "svelte": "./src/index.ts",

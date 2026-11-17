@@ -1,12 +1,12 @@
 // 項目の移動・コピー（切り取り・コピー・貼り付け・ドラッグ）の決まり。見た目は持たない。
-// 置き場所の決まりに合わせて先に判定する。最後の判定は置き場所（Disnans ではサーバー）。置き場所ごとの違いは Rules で受け取る。
-// - 共有フォルダと attachments/ の間は移動できない（コピーは可）。attachments/ の中の移動は名前の変更だけ（ファイルのみ）
+// 置き場所の決まりに合わせて先に判定する。最後の判定は置き場所。置き場所ごとの違いは Rules で受け取る。
+// - 特別なフォルダ（Rules.specialDir）の中と外の間は移動できない（コピーは可）。中の移動は名前の変更だけ（ファイルのみ）
 // - フォルダを自分の中へは移動・コピーできない
 // - 同名があれば上書き（必ず確認する）。同名のフォルダがあれば止める（sharedOps の共通規則）
 
 import type { Entry, ExplorerApi, Rules } from './types';
 import { baseName, childPath, parentOf } from './path';
-import { inAttachments, overwriteConfirm, RESERVED_REASON, sameNameEntry } from './ops';
+import { inSpecialDir, overwriteConfirm, ruleTexts, sameNameEntry } from './ops';
 
 export type TransferOp = 'move' | 'copy';
 
@@ -29,23 +29,24 @@ export type Check = { ok: true } | { ok: false; message: string };
 const ok: Check = { ok: true };
 const fail = (message: string): Check => ({ ok: false, message });
 
-/** 項目を、移動先のフォルダへ move / copy できるか（サーバーの決まりと同じ） */
+/** 項目を、移動先のフォルダへ move / copy できるか（置き場所の決まりと同じ） */
 export function checkTransfer(rules: Rules, op: TransferOp, item: TransferItem, destDir: string): Check {
-  if (rules.attachmentsDir !== null && item.path === rules.attachmentsDir) return fail(RESERVED_REASON);
+  const texts = ruleTexts(rules);
+  if (rules.specialDir !== null && item.path === rules.specialDir) return fail(texts.reserved);
   const trash = item.trash;
   if (trash?.where === 'root') return fail('ゴミ箱のフォルダは動かせません');
   if (trash?.where === 'inside' && op === 'move') return fail('ゴミ箱の中身は動かせません（コピーしてください）');
   if (trash?.where === 'item' && op === 'move') {
     // 移動は、元の場所へ戻すことだけ（元のパスぴったり）。ほかの先へは移せない
     const back = parentOf(trash.restoreTo);
-    return destDir === back ? ok : fail(`ゴミ箱の項目は、元の場所（${back === '' ? '共有フォルダの直下' : back}）へだけ戻せます`);
+    return destDir === back ? ok : fail(`ゴミ箱の項目は、元の場所（${back === '' ? `${texts.root}の直下` : back}）へだけ戻せます`);
   }
   // フォルダを自分自身・子孫へは移動もコピーもできない
   if (item.kind === 'dir' && (destDir === item.path || destDir.startsWith(item.path + '/'))) {
     return op === 'move' ? fail('フォルダを自分の中へは移せません') : fail('フォルダを自分の中へはコピーできません');
   }
   if (op === 'move' && !trash) {
-    if (inAttachments(rules, item.path) !== inAttachments(rules, destDir)) return fail('共有フォルダと添付の間は移動できません（コピーしてください）');
+    if (inSpecialDir(rules, item.path) !== inSpecialDir(rules, destDir)) return fail(texts.crossMove);
   }
   return ok;
 }
@@ -85,9 +86,9 @@ export function planTransfer(
     if (!destEntries) return blocked('フォルダの中身を読み終えてから、もう一度試してください');
     const same = sameNameEntry(rules, destEntries, destDir, name);
     if (!same) return { item, name, to, kind: 'create' };
-    // ゴミ箱から元へ戻すときは、上書きしない（同じ名前があれば戻せない。サーバーの決まり）
+    // ゴミ箱から元へ戻すときは、上書きしない（同じ名前があれば戻せない。置き場所の決まり）
     if (op === 'move' && item.trash?.where === 'item') return blocked('同じ名前があるので、元の場所へ戻せません');
-    // 上書きの先は既存の項目の名前（attachments/ は大文字・小文字を区別しない）
+    // 上書きの先は既存の項目の名前（特別なフォルダの中は大文字・小文字を区別しない）
     if (same.kind === 'dir') return blocked('同じ名前のフォルダがあります');
     return { item, name, to: childPath(destDir, same.name), kind: 'overwrite' };
   });
