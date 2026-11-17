@@ -45,7 +45,7 @@
     return props.explorer;
   }
   const explorer = pick();
-  const { api: sharedApi, urls, rules, host, nav: fileExplorer, index: sharedIndex, buffer: explorerBuffer, selection: explorerSelection, view: explorerView } = explorer;
+  const { api, urls, rules, host, nav: fileExplorer, index: dirIndex, buffer: explorerBuffer, selection: explorerSelection, view: explorerView } = explorer;
   const scopeSource = explorer.scope;
   const labels = explorer.labels;
   const PdfThumb = host.PdfThumb;
@@ -54,22 +54,22 @@
 
   // 置き場所の中身を見るパネル（閲覧だけ。書き込み・削除はしない）。見た目は仮（利用者の確認を取る）。
   // フォルダは中へ、画像は拡大表示、ほかのファイルはリンクで開く・保存する（明示的に押したときだけ）。
-  // 一覧は sharedIndex の写し。files.changed で捨てられたら、ここで読み直す。
+  // 一覧は dirIndex の写し。files.changed で捨てられたら、ここで読み直す。
   const listing = $derived(fileExplorer.state);
   /** 開いているフォルダの場所（ゴミ箱の直下の項目は、元の名前で表す） */
   const crumbs = $derived(breadcrumbs(fileExplorer.dir).map((c) => ({ ...c, name: crumbName(c.path, c.name) })));
   function crumbName(path: string, seg: string): string {
     if (parentOf(path) !== TRASH_ROOT) return seg;
-    const top = sharedIndex.state(TRASH_ROOT);
+    const top = dirIndex.state(TRASH_ROOT);
     const x = top?.kind === 'ok' ? top.entries.get(seg) : undefined;
     return x ? entryLabel(x) : seg;
   }
 
   /** 開いているフォルダが、仮想のゴミ箱の中か（印で決める。直下の一覧が無いときは確かめられない） */
-  const vdir = $derived(virtualDir(fileExplorer.dir, sharedIndex.state('')));
+  const vdir = $derived(virtualDir(fileExplorer.dir, dirIndex.state('')));
   /** 書き込みを止める理由（ゴミ箱の中・確かめ中）。ふつうのフォルダなら null */
   function writeBlock(dir: string): string | null {
-    return writeBlockReason(virtualDir(dir, sharedIndex.state('')));
+    return writeBlockReason(virtualDir(dir, dirIndex.state('')));
   }
 
   // 仮想のゴミ箱（.trash/ の中）を開いたときだけ、その判定に要る直下の一覧（と .trash の一覧）を読む。ほかのフォルダでは読まない
@@ -77,14 +77,14 @@
   $effect(() => {
     const dir = fileExplorer.dir;
     if (dir !== TRASH_ROOT && !dir.startsWith(TRASH_ROOT + '/')) return;
-    if (sharedIndex.state('') === undefined) untrack(() => sharedIndex.ensure(''));
-    if (dir !== TRASH_ROOT && sharedIndex.state(TRASH_ROOT) === undefined) untrack(() => sharedIndex.ensure(TRASH_ROOT));
+    if (dirIndex.state('') === undefined) untrack(() => dirIndex.ensure(''));
+    if (dir !== TRASH_ROOT && dirIndex.state(TRASH_ROOT) === undefined) untrack(() => dirIndex.ensure(TRASH_ROOT));
   });
   const now = Date.now();
 
   $effect(() => {
     const dir = fileExplorer.dir;
-    if (sharedIndex.state(dir) === undefined) untrack(() => sharedIndex.ensure(dir));
+    if (dirIndex.state(dir) === undefined) untrack(() => dirIndex.ensure(dir));
   });
 
   /** PC の Tauri（Windows・Linux）。選択の操作は常に効き、0 件でも終わらない（Android・ブラウザは従来の選択モード） */
@@ -206,13 +206,13 @@
     return {
       move: async (from, to, overwrite) => {
         assertScope(scope);
-        const r = await sharedApi.move(from, to, overwrite);
+        const r = await api.move(from, to, overwrite);
         assertScope(scope);
         return r;
       },
       copy: async (from, to, overwrite) => {
         assertScope(scope);
-        const r = await sharedApi.copy(from, to, overwrite);
+        const r = await api.copy(from, to, overwrite);
         assertScope(scope);
         return r;
       },
@@ -297,7 +297,7 @@
       host.toast(SERVER_CHANGED, 'error');
       return null;
     }
-    const h = sharedApi.upload(plan.path, file, (r) => (row.ratio = r));
+    const h = api.upload(plan.path, file, (r) => (row.ratio = r));
     row.abort = h.abort;
     try {
       await h.promise;
@@ -307,7 +307,7 @@
         host.toast(SERVER_CHANGED, 'error');
         return null;
       }
-      sharedIndex.invalidate(plan.path);
+      dirIndex.invalidate(plan.path);
       if (batch) {
         const name = baseName(plan.path);
         batch.entries.set(name, { name, path: plan.path, kind: 'file', size: file.size, modified: Date.now(), mime: file.type || null, });
@@ -644,8 +644,8 @@
           break;
         }
         done.push({ alias: t.alias });
-        sharedIndex.invalidate(t.alias);
-        if (r && typeof r === 'object' && typeof r.path === 'string') sharedIndex.invalidate(r.path);
+        dirIndex.invalidate(t.alias);
+        if (r && typeof r === 'object' && typeof r.path === 'string') dirIndex.invalidate(r.path);
       } catch (err) {
         if (!scope.alive()) {
           changed = true;
@@ -690,7 +690,7 @@
       const targets = wholeTargets();
       if (targets.length === 0) return;
       const scope = beginScope();
-      await wholeBatch(targets, scope, (id) => sharedApi.restore(id), (n) => `${n} 件を元の場所に戻しました`);
+      await wholeBatch(targets, scope, (id) => api.restore(id), (n) => `${n} 件を元の場所に戻しました`);
     });
   }
 
@@ -708,7 +708,7 @@
         host.toast(SERVER_CHANGED, 'error');
         return;
       }
-      await wholeBatch(targets, scope, async (id) => void (await sharedApi.purge(id)), (n) => `${n} 件を完全に削除しました`);
+      await wholeBatch(targets, scope, async (id) => void (await api.purge(id)), (n) => `${n} 件を完全に削除しました`);
     });
   }
 
@@ -738,9 +738,9 @@
       // 次の項目を移す前に、置き場所が変わっていないか確かめる（変わったら残りは移さない）
       if (!scope.alive()) break;
       try {
-        const trashed = await sharedApi.trash(i.path);
+        const trashed = await api.trash(i.path);
         succeeded.push({ id: trashed.id, path: i.path });
-        if (scope.alive()) sharedIndex.invalidate(i.path);
+        if (scope.alive()) dirIndex.invalidate(i.path);
       } catch (err) {
         failed.push(`${baseName(i.path)}: ${host.errorText(err)}`);
       }
@@ -777,9 +777,9 @@
     for (const id of ids) {
       assertScope(scope);
       try {
-        const restored = await sharedApi.restore(id);
+        const restored = await api.restore(id);
         assertScope(scope);
-        sharedIndex.invalidate(restored.path);
+        dirIndex.invalidate(restored.path);
       } catch (err) {
         if (err instanceof ServerChangedError) throw err;
         failed.push(host.errorText(err));
@@ -807,7 +807,7 @@
   function pressStart(ev: PointerEvent, path: string): void {
     if (ev.pointerType === 'mouse' && ev.button !== 0) return;
     // 項目の「…」の上の長押しは、選択に入れない
-    if (ev.target instanceof Element && ev.target.closest('.shared-entry-actions, .file-explorer-rename')) return;
+    if (ev.target instanceof Element && ev.target.closest('.explorer-entry-actions, .file-explorer-rename')) return;
     longPressed = false;
     pressFrom = { x: ev.clientX, y: ev.clientY };
     pressLog = ev.pointerType === 'mouse' ? null : { t: Date.now(), type: ev.pointerType };
@@ -950,8 +950,8 @@
     }
     renameBusy = true;
     try {
-      await sharedApi.move(path, renameTarget(path, to));
-      sharedIndex.invalidate(path);
+      await api.move(path, renameTarget(path, to));
+      dirIndex.invalidate(path);
       if (renamingPath === path) renamingPath = null;
     } catch (err) {
       renameError = host.errorText(err);
@@ -1144,7 +1144,7 @@
       confirm: (c) => host.confirm(c),
       api: scopedTransfer(scope),
       invalidate: (p) => {
-        if (scope.alive()) sharedIndex.invalidate(p);
+        if (scope.alive()) dirIndex.invalidate(p);
       },
     });
     if (!scope.alive()) {
@@ -1159,14 +1159,14 @@
 
   /**
    * 宛先フォルダの一覧を取得して返す共通ヘルパー。
-   * キャッシュがあればそのまま、なければ sharedApi.list で明示取得。
+   * キャッシュがあればそのまま、なければ api.list で明示取得。
    * 失敗時はトーストでエラーを通知して null を返す（書込なし保証）。
    */
   async function fetchDestEntries(destDir: string): Promise<ReadonlyMap<string, Entry> | null> {
-    const cached = sharedIndex.state(destDir);
+    const cached = dirIndex.state(destDir);
     if (cached?.kind === 'ok') return cached.entries;
     try {
-      const listed = await sharedApi.list(destDir);
+      const listed = await api.list(destDir);
       return new Map(listed.map((e) => [e.name, e]));
     } catch (err) {
       host.toast(`宛先の一覧を取得できませんでした: ${host.errorText(err)}`, 'error');
@@ -1291,8 +1291,8 @@
       const path = childPath(destDir, e.rel);
       if (e.dir) {
         try {
-          await sharedApi.mkdir(path);
-          sharedIndex.invalidate(path);
+          await api.mkdir(path);
+          dirIndex.invalidate(path);
         } catch (err) {
           // 409 exists を含むすべてのエラーで中断（マージ禁止・再開禁止）
           host.toast(`フォルダ「${e.rel}」を作れませんでした: ${host.errorText(err)}`, 'error');
@@ -1305,8 +1305,8 @@
             host.toast(UPLOAD_SCOPE_CHANGED, 'error');
             return;
           }
-          await sharedApi.write(path, blob);
-          sharedIndex.invalidate(path);
+          await api.write(path, blob);
+          dirIndex.invalidate(path);
         } catch (err) {
           host.toast(`「${e.rel}」を送れませんでした: ${host.errorText(err)}`, 'error');
           // ファイルの失敗は続ける（並行他ファイルへの影響なし）
@@ -1374,8 +1374,8 @@
     const path = childPath(dir, name);
     mkdirBusy = true;
     try {
-      await sharedApi.mkdir(path);
-      sharedIndex.invalidate(path);
+      await api.mkdir(path);
+      dirIndex.invalidate(path);
       mkdirOpen = false;
     } catch (err) {
       mkdirError = host.errorText(err);
@@ -1794,7 +1794,7 @@
     background: var(--file-explorer-item-bg);
   }
   /* 詳細では「…」が右端に固定され下が透けないので、選んだ行の色を「…」にも付ける（アイコン表示は付けない） */
-  .file-explorer-view-details .file-explorer-item-selected > :global(.shared-entry-actions .shared-entry-menu-button) {
+  .file-explorer-view-details .file-explorer-item-selected > :global(.explorer-entry-actions .explorer-entry-menu-button) {
     background: var(--file-explorer-item-bg);
   }
   .file-explorer-popup {
@@ -1847,7 +1847,7 @@
     min-width: 120px;
   }
   /* 「…」は、横にスワイプしても右端に残す */
-  .file-explorer-view-details .file-explorer-item > :global(.shared-entry-actions) {
+  .file-explorer-view-details .file-explorer-item > :global(.explorer-entry-actions) {
     position: sticky;
     right: 0;
     background: var(--file-explorer-item-bg);

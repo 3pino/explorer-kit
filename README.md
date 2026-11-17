@@ -1,6 +1,6 @@
 # @3pino/explorer-kit
 
-ファイルエクスプローラーの共有の部品（Svelte 5）。[disnans](https://github.com/3pino/disnans) の共有フォルダの画面と、disrect（ファイラー）が同じものを使います。
+ファイルエクスプローラーの共有の部品（Svelte 5）。特定のアプリの言葉は持たず、使うアプリが「置き場所」と「本体から借りる機能」を渡して、自分の画面を作ります（例: [fixplor](https://github.com/3pino/fixplor) は「この端末」を、サーバーのアプリは「サーバーのフォルダ」を渡す）。
 
 - **画面**: `FileExplorer.svelte`（一覧・アイコン表示・選択・コピー／切り取り／貼り付け・ドラッグ・名前の変更・ゴミ箱・外からの取り込み）、`FileProperties.svelte`、`EntryActions.svelte`。ボタン・メニュー・ダイアログなどの小さな部品は [@3pino/ui-kit-web](https://github.com/3pino/ui-kit-web) のもの
 - **決まり**（見た目を持たない）: 名前・同名の扱い（`ops`）、移動とコピーの進め方（`transfer`）、ゴミ箱の仮想フォルダ（`trashFolder`）、並び順（`listing`）、フォルダごとの表示（`dirs`）
@@ -13,17 +13,22 @@
 
 部品は、次の 2 つだけを通して外とやりとりします（`src/types.ts`）。
 
-| 口 | 中身 | disnans | disrect |
+| 口 | 中身 | 例: サーバーのフォルダ | 例: この端末（fixplor） |
 | --- | --- | --- | --- |
-| 置き場所 `ExplorerApi`（＋`EntryUrls`・`Rules`・`ScopeSource`） | 一覧・書き込み・移動・コピー・ゴミ箱・大きさ。パスは、いちばん上からの相対（区切り `/`） | サーバーの共有フォルダ（REST） | この端末（Rust のコマンド） |
+| 置き場所 `ExplorerApi`（＋`EntryUrls`・`Rules`・`ScopeSource`） | 一覧・書き込み・移動・コピー・ゴミ箱・大きさ。パスは、いちばん上からの相対（区切り `/`） | サーバーの API | Rust のコマンド |
 | 本体から借りる機能 `ExplorerHost` | 通知・確認・「戻る」・拡大表示・クリップボード・保存・OS からのドロップ・この端末の種類 | アプリの既存の機能 | 自分の実装 |
 
-`Rules` は置き場所ごとの決まり（添付のフォルダ・名前）。添付のフォルダが無い置き場所は `attachmentsDir: null` にします。
+`Rules` は置き場所ごとの決まり（特別なフォルダ・名前・文）。
+- **特別なフォルダ** `specialDir`: そのフォルダそのものは動かせない・消せない／中にはファイルだけ（フォルダは作れない）／中と外の間は移動できない（コピーはできる）／中では、大文字・小文字だけが違う名前を同じ名前として扱う。無い置き場所は `null`。
+- **文** `texts`（省ける）: 特別なフォルダの理由・確認の文などを、アプリの言葉で渡せる（`RuleTexts`）。省くと一般の文になる。
+- 画面に出る呼び名は `labels`（`root`・`upload`、置き場所が切り替わるなら `scope`）で渡す。
+- ドラッグで運ぶ項目の印は `EXPLORER_DRAG_TYPE`（`application/x-explorer-kit-items`）。ほかのドロップ先が、この部品のドラッグかを見分けるのに使える。
+- 項目（`Entry`）の `message_id`・`file_id` は、置き場所が足す任意の欄（部品は読まない）。
 
 ## 使い方
 
 ```sh
-npm install github:3pino/explorer-kit#v0.1.0
+npm install github:3pino/explorer-kit#v0.3.0
 ```
 
 配布はソースのまま（`.svelte`・`.svelte.ts`・`.ts`）。取り込む側の Vite（`@sveltejs/vite-plugin-svelte`）が変換します。
@@ -36,7 +41,7 @@ optimizeDeps: { exclude: ['@3pino/explorer-kit', '@3pino/ui-kit-web'] },
 ```ts
 import { createExplorer } from '@3pino/explorer-kit';
 
-export const explorer = createExplorer({ api, urls, rules, host, viewStore, labels: { root: "共有フォルダ", upload: "アップロード" } });
+export const explorer = createExplorer({ api, urls, rules, host, viewStore, labels: { root: 'この端末', upload: '取り込む' } });
 ```
 
 ```svelte
@@ -58,8 +63,9 @@ npm run check   # 型
 npm test        # 決まり・状態・画面の試験
 ```
 
-画面の細かい流れ（同名の確認・貼り付け・ゴミ箱の項目・OS からのドロップ）は、disnans の `app/src/components/FileExplorer.test.ts` が、
-この部品に Disnans の実装を渡して確かめています。部品を変えたら、disnans の試験も通ることを確かめてからタグを打ちます。
+画面の細かい流れ（同名の確認・貼り付け・選択・ゴミ箱の項目・OS からのドロップ・置き場所が変わったとき・プロパティ）は、
+この部品の中の試験（`src/FileExplorer.screen.test.ts`・`src/FileProperties.screen.test.ts`）が、メモリの中の偽の置き場所と本体（`src/test-support/screen.svelte.ts`）で確かめます。
+使うアプリの側の試験は、その置き場所・本体の配線が正しいことだけを確かめれば足ります。
 
 ## 変更するとき
 

@@ -8,7 +8,7 @@ export const RULES: Rules = {
   specialDir: 'special',
   nameError: (_dir, name) => kit.basicNameError(name),
   texts: {
-    root: '共有フォルダ',
+    root: 'ルート',
     reserved: '特別なフォルダは動かせません',
     crossMove: '特別なフォルダの内外の間は移動できません（コピーしてください）',
     noSubfolder: '特別なフォルダ内にフォルダは作れません',

@@ -7,7 +7,7 @@ import { PLAIN_RULES, dir, fakeApi, fakeHost, fakeUrls, file } from './test-supp
 import type { ExplorerHost } from './types';
 
 // 画面が、渡された置き場所（api）と本体（host）だけで動くこと。細かい流れ（同名の確認・貼り付け・ゴミ箱の項目など）は、
-// Disnans の側の試験（app/src/components/FileExplorer.test.ts）が、同じ部品に Disnans の実装を渡して確かめている。
+// 細かい流れの試験は FileExplorer.screen.test.ts（メモリの中の偽の置き場所）にある。
 
 const tick = async (): Promise<void> => {
   for (let i = 0; i < 5; i++) {

@@ -44,7 +44,7 @@ export type Size = { size: number; files: number; dirs: number };
 export type UploadHandle = { promise: Promise<unknown>; abort: () => void };
 
 /**
- * 置き場所（この端末・ネットワークドライブ・サーバーの共有フォルダなど）。パスは、いちばん上からの相対（`docs/a.txt`）。
+ * 置き場所（この端末・ネットワークドライブ・サーバーのフォルダなど）。パスは、いちばん上からの相対（`docs/a.txt`）。
  * 同名の決まり: write は黙って上書きする（呼ぶ側が先に確かめる）。move・copy は overwrite が真のときだけ、ファイルを置き換える。
  */
 export interface ExplorerApi {
@@ -89,7 +89,7 @@ export type RuleTexts = {
 /** 置き場所ごとの決まり（名前・特別なフォルダ） */
 export type Rules = {
   /**
-   * 特別なフォルダ（いちばん上からの相対パス。例 `attachments`）。無ければ null。
+   * 特別なフォルダ（いちばん上からの相対パス。例 `reserved`）。無ければ null。
    * 決まり: フォルダそのものは動かせない・消せない／中にはファイルだけ（フォルダは作れない）／中と外の間は移動できない（コピーはできる）／
    * 中では、大文字・小文字だけが違う名前を同じ名前として扱う。
    */

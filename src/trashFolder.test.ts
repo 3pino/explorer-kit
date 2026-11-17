@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import type { DirState, Entry as SharedEntry, TrashEntry as SharedTrashEntry } from './types';
+import type { DirState, Entry, TrashEntry } from './types';
 import { displayEntry, entryLabel, trashPlace, virtualDir, writeBlockReason, restoreParent } from './trashFolder';
 
-const base = (name: string, path: string, kind: 'file' | 'dir' = 'file'): SharedEntry => ({
+const base = (name: string, path: string, kind: 'file' | 'dir' = 'file'): Entry => ({
   name, path, kind, size: 1, modified: 0, mime: null, message_id: null, file_id: null,
 });
-const trashed = (id: string, original: string, kind: 'file' | 'dir' = 'file'): SharedTrashEntry => ({
+const trashed = (id: string, original: string, kind: 'file' | 'dir' = 'file'): TrashEntry => ({
   id, original_path: original, kind, size: 1, deleted_at: 0,
 });
-const item = (id: string, original: string, kind: 'file' | 'dir' = 'file'): SharedEntry => {
+const item = (id: string, original: string, kind: 'file' | 'dir' = 'file'): Entry => {
   const leaf = original.split('/').pop()!;
   return { ...base(`${id}--${leaf}`, `.trash/${id}--${leaf}`, kind), trash: { kind: 'item', entry: trashed(id, original, kind) } };
 };
-const ok = (entries: SharedEntry[]): DirState => ({ kind: 'ok', entries: new Map(entries.map((e) => [e.name, e])) });
+const ok = (entries: Entry[]): DirState => ({ kind: 'ok', entries: new Map(entries.map((e) => [e.name, e])) });
 const ROOT_VIRTUAL = base('.trash', '.trash', 'dir');
 ROOT_VIRTUAL.trash = { kind: 'root' };
 
@@ -43,7 +43,7 @@ describe('ゴミ箱の表示名（元の名前。要求の path は変えない�
 });
 
 describe('仮想のゴミ箱の場所（印で決める。.trash という名前だけでは決めない）', () => {
-  it('共有フォルダの直下に、ルートの印の .trash があれば、.trash は仮想', () => {
+  it('いちばん上の直下に、ルートの印の .trash があれば、.trash は仮想', () => {
     const root = ok([ROOT_VIRTUAL, base('docs', 'docs', 'dir')]);
     expect(virtualDir('.trash', root)).toBe('root');
     expect(virtualDir('.trash/X--a', root)).toBe('inside');

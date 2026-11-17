@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import type { Entry as SharedEntry } from './types';
+import type { Entry } from './types';
 import * as listing from './listing';
 import { basicViewerKind, isImageName } from './kinds';
 import { breadcrumbs, sortEntries } from './listing';
 
-const kindLabel = (x: SharedEntry): string => listing.kindLabel(x, isImageName);
-const entryAction = (x: SharedEntry): string => listing.entryAction(x, basicViewerKind);
+const kindLabel = (x: Entry): string => listing.kindLabel(x, isImageName);
+const entryAction = (x: Entry): string => listing.entryAction(x, basicViewerKind);
 
-const e = (name: string, kind: 'file' | 'dir' = 'file', mime: string | null = null, size = 0, modified = 0): SharedEntry => ({
+const e = (name: string, kind: 'file' | 'dir' = 'file', mime: string | null = null, size = 0, modified = 0): Entry => ({
   name,
   path: name,
   kind,

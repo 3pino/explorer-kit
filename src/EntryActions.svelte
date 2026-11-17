@@ -27,9 +27,9 @@
   }
 </script>
 
-<span class="shared-entry-actions" class:shared-entry-actions-inline={placement === 'inline'} class:shared-entry-actions-open={open}>
+<span class="explorer-entry-actions" class:explorer-entry-actions-inline={placement === 'inline'} class:explorer-entry-actions-open={open}>
   <IconButton
-    class="shared-entry-menu-button"
+    class="explorer-entry-menu-button"
     label="{name} の操作"
     icon={Ellipsis}
     iconSize={16}
@@ -37,8 +37,8 @@
     onclick={() => (open = !open)}
   />
   {#if open}
-    <Menu class="shared-entry-menu" label="項目の操作" onclose={() => (open = false)}>
-      <MenuItem class="shared-entry-menu-item" icon={Info} onclick={openProperties}>プロパティ</MenuItem>
+    <Menu class="explorer-entry-menu" label="項目の操作" onclose={() => (open = false)}>
+      <MenuItem class="explorer-entry-menu-item" icon={Info} onclick={openProperties}>プロパティ</MenuItem>
     </Menu>
   {/if}
 </span>
@@ -48,12 +48,12 @@
 {/if}
 
 <style>
-  .shared-entry-actions {
+  .explorer-entry-actions {
     position: absolute;
     top: var(--space-2);
     right: var(--space-2);
   }
-  .shared-entry-actions-inline {
+  .explorer-entry-actions-inline {
     position: relative;
     top: auto;
     right: auto;
@@ -63,11 +63,11 @@
   }
   /* 開いている間は、この箱ごとメニューの高さに上げる。箱が重なりの層を作るとき（詳細の右端に固定する sticky）、
      メニューはその層から出られず、後ろの行の「…」に覆われるため */
-  .shared-entry-actions-open {
+  .explorer-entry-actions-open {
     z-index: var(--z-menu);
   }
   /* z-index は指定しない（.menu の --z-menu。下げると外側の幕に覆われて項目が押せない） */
-  .shared-entry-actions > :global(.shared-entry-menu) {
+  .explorer-entry-actions > :global(.explorer-entry-menu) {
     position: absolute;
     top: calc(100% + 6px);
     right: 0;

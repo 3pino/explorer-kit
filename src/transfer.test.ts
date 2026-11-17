@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { RULES, checkTransfer, planTransfer, runTransfer, transferFailure, type TransferItem } from './test-support/rules';
 import * as kit from './index';
-import type { Entry as SharedEntry } from './types';
+import type { Entry } from './types';
 
 const f = (path: string): TransferItem => ({ path, kind: 'file' });
 const d = (path: string): TransferItem => ({ path, kind: 'dir' });
-const entry = (path: string, kind: 'file' | 'dir' = 'file'): SharedEntry => ({
+const entry = (path: string, kind: 'file' | 'dir' = 'file'): Entry => ({
   name: path.split('/').pop()!,
   path,
   kind,
@@ -15,10 +15,10 @@ const entry = (path: string, kind: 'file' | 'dir' = 'file'): SharedEntry => ({
   message_id: null,
   file_id: null,
 });
-const entries = (...list: SharedEntry[]) => new Map(list.map((e) => [e.name, e]));
+const entries = (...list: Entry[]) => new Map(list.map((e) => [e.name, e]));
 
-describe('checkTransfer（サーバーの決まりと同じ）', () => {
-  it('共有フォルダの中の移動・コピーはできる（フォルダの移動も）', () => {
+describe('checkTransfer（置き場所の決まりと同じ）', () => {
+  it('いちばん上の側の移動・コピーはできる（フォルダの移動も）', () => {
     expect(checkTransfer('move', d('docs'), 'other').ok).toBe(true);
     expect(checkTransfer('move', f('a.txt'), 'docs').ok).toBe(true);
     expect(checkTransfer('copy', f('a.txt'), 'docs').ok).toBe(true);
@@ -164,7 +164,7 @@ describe('runTransfer', () => {
 });
 
 describe('ゴミ箱の項目（仮想フォルダ）の移動・コピー', () => {
-  const ENTRY = (name: string, path: string): SharedEntry => ({ name, path, kind: 'file', size: 1, modified: 0, mime: null, message_id: null, file_id: null });
+  const ENTRY = (name: string, path: string): Entry => ({ name, path, kind: 'file', size: 1, modified: 0, mime: null });
   const item = (path: string, restoreTo: string, name = restoreTo.split('/').pop()): TransferItem => ({
     path,
     kind: 'file',
