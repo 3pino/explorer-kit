@@ -23,12 +23,13 @@
 - **文** `texts`（省ける）: 特別なフォルダの理由・確認の文などを、アプリの言葉で渡せる（`RuleTexts`）。省くと一般の文になる。
 - 画面に出る呼び名は `labels`（`root`・`upload`、置き場所が切り替わるなら `scope`）で渡す。
 - ドラッグで運ぶ項目の印は `EXPLORER_DRAG_TYPE`（`application/x-explorer-kit-items`）。ほかのドロップ先が、この部品のドラッグかを見分けるのに使える。
+- **ゴミ箱の無い置き場所**（ネットワークドライブなど）は、`createExplorer({ caps: { trash: false } })`。削除は完全な削除になり、部品は `api.trash` の代わりに `api.remove(path)`（その置き場所が実装する）を呼ぶ。確認は「完全に削除します。元に戻せません」で、「取り消す」は出ない。
 - 項目（`Entry`）の `message_id`・`file_id` は、置き場所が足す任意の欄（部品は読まない）。
 
 ## 使い方
 
 ```sh
-npm install github:3pino/explorer-kit#v0.3.0
+npm install github:3pino/explorer-kit#v0.4.0
 ```
 
 配布はソースのまま（`.svelte`・`.svelte.ts`・`.ts`）。取り込む側の Vite（`@sveltejs/vite-plugin-svelte`）が変換します。

@@ -29,7 +29,7 @@
   import { breadcrumbs, entryAction, kindLabel, sortEntries } from './listing';
   import type { ViewMode } from './stores/view.svelte';
   import { baseName, parentOf } from './path';
-  import { childPath, EXPLORER_DRAG_TYPE, inSpecialDir, overwriteConfirm, planUpload, renameAllowed, renameTarget, ruleTexts, sameNameEntry, trashManyConfirm } from './ops';
+  import { childPath, EXPLORER_DRAG_TYPE, inSpecialDir, overwriteConfirm, permanentDeleteConfirm, planUpload, renameAllowed, renameTarget, ruleTexts, sameNameEntry, trashManyConfirm } from './ops';
   import { runTransfer, transferFailure, type TransferItem, type TransferOp } from './transfer';
   import { TRASH_ROOT, displayEntry, entryLabel, trashItemOf, trashPlace, virtualDir, writeBlockReason } from './trashFolder';
   import { allWholeTrash, copyBlockedReason, cutBlockedReason, deleteBlockedReason, transferItemOf } from './selection';
@@ -727,7 +727,9 @@
     if (items.length === 0 || deleteBlocked) return;
     // 範囲（置き場所）は、選んで押したときのもの。確認を待つあいだに変わったら、何も移さない
     const scope = beginScope();
-    if (!(await host.confirm(trashManyConfirm(rules, items, explorer.caps.restore)))) return;
+    // ゴミ箱の無い置き場所は、完全な削除（元に戻せないので、その文で確認する）
+    const permanent = !explorer.caps.trash;
+    if (!(await host.confirm(permanent ? permanentDeleteConfirm(items) : trashManyConfirm(rules, items, explorer.caps.restore)))) return;
     if (!scope.alive()) {
       host.toast(SERVER_CHANGED, 'error');
       return;
@@ -738,8 +740,14 @@
       // 次の項目を移す前に、置き場所が変わっていないか確かめる（変わったら残りは移さない）
       if (!scope.alive()) break;
       try {
-        const trashed = await api.trash(i.path);
-        succeeded.push({ id: trashed.id, path: i.path });
+        if (permanent) {
+          if (!api.remove) throw new Error('この置き場所は、完全な削除に対応していません');
+          await api.remove(i.path);
+          succeeded.push({ id: '', path: i.path });
+        } else {
+          const trashed = await api.trash(i.path);
+          succeeded.push({ id: trashed.id, path: i.path });
+        }
         if (scope.alive()) dirIndex.invalidate(i.path);
       } catch (err) {
         failed.push(`${baseName(i.path)}: ${host.errorText(err)}`);
@@ -756,13 +764,13 @@
       // 取り消しは、削除した置き場所へだけ送る（restoreBatch が確かめる）
       const trashServerUrl = scope.url;
       // 「取り消す」は、この部品から元へ戻せる置き場所だけ
-      const undo = explorer.caps.restore
+      const undo = explorer.caps.restore && !permanent
         ? { label: '取り消す', run: () => void restoreBatch(ids, trashServerUrl).catch((e) => host.toast(host.errorText(e), 'error')) }
         : undefined;
-      host.toast(`${ids.length} 件をゴミ箱に移しました`, 'info', undo);
+      host.toast(permanent ? `${ids.length} 件を完全に削除しました` : `${ids.length} 件をゴミ箱に移しました`, 'info', undo);
     }
     if (changed) host.toast(`${SERVER_CHANGED}。残りは移していません`, 'error');
-    if (failed.length > 0) host.toast(`${failed.length} 件をゴミ箱に移せませんでした（${failed[0]}）`, 'error');
+    if (failed.length > 0) host.toast(`${failed.length} 件を${permanent ? '完全に削除できませんでした' : 'ゴミ箱に移せませんでした'}（${failed[0]}）`, 'error');
   }
 
   /**

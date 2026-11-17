@@ -58,6 +58,11 @@ export interface ExplorerApi {
   restore(id: string): Promise<Entry>;
   /** ゴミ箱の項目を完全に消す（caps.restore が真のときだけ呼ぶ） */
   purge(id: string): Promise<void>;
+  /**
+   * 完全に削除する（元に戻せない）。ゴミ箱の無い置き場所（caps.trash が偽）だけが持つ。部品は、確認を取ってから呼ぶ。
+   * caps.trash が偽なら、部品は trash の代わりにこれを呼ぶ。
+   */
+  remove?(path: string): Promise<void>;
   size(path: string): Promise<Size>;
   move(from: string, to: string, overwrite?: boolean): Promise<Entry>;
   copy(from: string, to: string, overwrite?: boolean): Promise<Entry>;

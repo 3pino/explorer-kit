@@ -9,6 +9,11 @@ import type { DirIndexLike, EntryUrls, ExplorerApi, ExplorerHost, Rules, ScopeSo
 export type ExplorerCaps = {
   /** ゴミ箱へ入れたものを、この部品から元へ戻せる（削除のあとの「取り消す」） */
   restore: boolean;
+  /**
+   * 削除がゴミ箱へ入れるものか（既定 true）。偽のときは、削除は完全な削除（元に戻せない）になり、
+   * 部品は `api.remove` を呼び、確認の文も「完全に削除します。元に戻せません」にする（ゴミ箱の無い置き場所用。`remove` が要る）。
+   */
+  trash: boolean;
 };
 
 /** 置き場所ごとの言葉（画面に出す文字） */
@@ -78,7 +83,7 @@ export function createExplorer(options: ExplorerOptions): Explorer {
     urls: options.urls,
     rules: options.rules,
     scope,
-    caps: { restore: true, ...options.caps },
+    caps: { restore: true, trash: true, ...options.caps },
     labels: options.labels,
     host: options.host,
     index,

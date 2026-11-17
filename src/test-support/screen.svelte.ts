@@ -27,7 +27,7 @@ export const h = {
   write: vi.fn(async (path: string, _body?: Blob | ArrayBuffer | string) => ({ ...entry(path.split('/').pop()!), path })),
   mkdir: vi.fn(async (_path?: string) => ({}) as Entry),
   copy: vi.fn(async (_from: string, _to: string, _overwrite?: boolean) => ({}) as Entry),
-  /** 置き場所の削除（部品は、ゴミ箱へ入れる trash だけを使う。呼ばれないことの確認用） */
+  /** 完全に削除（caps.trash が偽のときだけ呼ばれる。ふつうは呼ばれないことの確認用） */
   remove: vi.fn(async (_path: string) => {}),
   trash: vi.fn(async (path: string) => ({ id: `id-${path}`, original_path: path, kind: 'file' as const, size: 1, deleted_at: 0 })),
   restore: vi.fn(async (_id: string) => ({ name: '', path: '', kind: 'file' as const, size: 1, modified: 0, mime: null }) as Entry),
@@ -117,6 +117,7 @@ const api: ExplorerApi = {
   trash: (...a) => h.trash(...a),
   restore: (...a) => h.restore(...a),
   purge: (...a) => h.purge(...a),
+  remove: (...a) => h.remove(...a),
   size: (...a) => h.size(...a),
   move: (...a) => h.move(...a) as Promise<Entry>,
   copy: (...a) => h.copy(...a) as Promise<Entry>,

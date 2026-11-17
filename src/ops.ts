@@ -62,6 +62,11 @@ export function trashManyConfirm(
   return { title: `${n} 件をゴミ箱に移しますか`, body: notes.join('。'), okLabel: 'ゴミ箱に移す', danger: true };
 }
 
+/** 複数の項目を完全に削除する確認の文（ゴミ箱の無い置き場所。元に戻せない） */
+export function permanentDeleteConfirm(items: readonly { path: string; kind: 'file' | 'dir' }[]): { title: string; body: string; okLabel: string; danger: true } {
+  return { title: `${items.length} 件を完全に削除しますか`, body: '完全に削除します。元に戻せません', okLabel: '完全に削除', danger: true };
+}
+
 /** 同名のファイルを上書きする確認の文（必ず確認する）。特別なフォルダの中は、置き場所の文（Rules.texts.overwriteBody）があればそれ */
 export function overwriteConfirm(rules: Rules, path: string): { title: string; body: string; okLabel: string; danger: true } {
   const name = baseName(path);

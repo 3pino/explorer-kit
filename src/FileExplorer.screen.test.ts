@@ -2200,3 +2200,82 @@ describe('ドラッグの印（EXPLORER_DRAG_TYPE）', () => {
     expect(other.defaultPrevented).toBe(false);
   });
 });
+
+describe('ゴミ箱の無い置き場所（caps.trash が偽）の削除は、確認のうえ完全に削除する', () => {
+  const pressDelete = async (el: HTMLElement, names: string[]) => {
+    explorerSelection.enter();
+    flushSync();
+    for (const n of names) {
+      rowOf(el, n).querySelector<HTMLButtonElement>('.file-explorer-row')!.click();
+      flushSync();
+    }
+    el.querySelector<HTMLButtonElement>('button[aria-label="削除"]')!.click();
+    await vi.waitFor(() => expect(ui.confirmReq).not.toBeNull());
+  };
+  beforeEach(() => {
+    explorer.caps.trash = false;
+    h.remove.mockReset();
+    h.remove.mockResolvedValue(undefined);
+  });
+  afterEach(() => {
+    explorer.caps.trash = true;
+  });
+
+  it('確認は「完全に削除します。元に戻せません」。答えるまで消さない。ゴミ箱の口は呼ばない', async () => {
+    const el = await render();
+    await pressDelete(el, ['a.txt', 'docs']);
+    expect(ui.confirmReq).toMatchObject({ title: '2 件を完全に削除しますか', body: '完全に削除します。元に戻せません', okLabel: '完全に削除', danger: true });
+    expect(h.remove).not.toHaveBeenCalled();
+    ui.confirmReq!.resolve(true);
+    await vi.waitFor(() => expect(h.remove).toHaveBeenCalledTimes(2));
+    expect(h.remove.mock.calls.map((c) => c[0])).toEqual(['a.txt', 'docs']);
+    expect(h.trash).not.toHaveBeenCalled();
+  });
+
+  it('取り消すと、何も消さない', async () => {
+    const el = await render();
+    await pressDelete(el, ['a.txt']);
+    ui.confirmReq!.resolve(false);
+    await new Promise((r) => setTimeout(r, 30));
+    expect(h.remove).not.toHaveBeenCalled();
+    expect(ui.toasts).toHaveLength(0);
+  });
+
+  it('終わりの知らせは「完全に削除しました」で、「取り消す」は出さない（戻せない）', async () => {
+    const el = await render();
+    await pressDelete(el, ['a.txt']);
+    ui.confirmReq!.resolve(true);
+    await vi.waitFor(() => expect(ui.toasts.some((t) => t.text === '1 件を完全に削除しました')).toBe(true));
+    expect(ui.toasts.some((t) => t.action)).toBe(false);
+  });
+
+  it('失敗したものは、理由つきで知らせ、成功した分だけ完了にする', async () => {
+    h.remove.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('locked'));
+    const el = await render();
+    await pressDelete(el, ['a.txt', 'docs']);
+    ui.confirmReq!.resolve(true);
+    await vi.waitFor(() => expect(ui.toasts.some((t) => t.text.startsWith('1 件を完全に削除できませんでした（docs'))).toBe(true));
+    expect(ui.toasts.some((t) => t.text === '1 件を完全に削除しました')).toBe(true);
+  });
+
+  it('確認を待つあいだに置き場所が変わったら、消さない', async () => {
+    const el = await render();
+    await pressDelete(el, ['a.txt']);
+    switchPlace('http://b.test');
+    ui.confirmReq!.resolve(true);
+    await vi.waitFor(() => expect(ui.toasts.some((t) => t.kind === 'error')).toBe(true));
+    expect(h.remove).not.toHaveBeenCalled();
+  });
+
+  it('remove を持たない置き場所は、失敗として知らせる（ゴミ箱へは切り替えない）', async () => {
+    const el = await render();
+    const saved = h.remove;
+    // 口に remove が無い形（api は共有の 1 つなので、呼ぶ側が undefined を見るように一時的に外す）
+    await pressDelete(el, ['a.txt']);
+    h.remove = undefined as never;
+    ui.confirmReq!.resolve(true);
+    await vi.waitFor(() => expect(ui.toasts.some((t) => t.text.includes('完全に削除できませんでした'))).toBe(true));
+    expect(h.trash).not.toHaveBeenCalled();
+    h.remove = saved;
+  });
+});
